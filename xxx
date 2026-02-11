@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UT Table Tennis Team - 德州大学乒乓球队</title>
+    <style>
+        :root {
+            --ut-orange: #BF5700;
+            --ut-dark: #333f48;
+            --white: #ffffff;
+        }
+
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 0;
+            background-color: #f4f4f4;
+            color: var(--ut-dark);
+        }
+
+        header {
+            background-color: var(--ut-orange);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .team-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 2rem;
+        }
+
+        /* 队员卡片样式 */
+        .member-card {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            transition: transform 0.3s;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            text-align: center;
+            cursor: pointer;
+        }
+
+        .member-card:hover {
+            transform: translateY(-10px);
+        }
+
+        .member-photo {
+            width: 100%;
+            height: 250px;
+            background-color: #ddd;
+            object-fit: cover;
+        }
+
+        .member-info {
+            padding: 1.5rem;
+        }
+
+        .member-name {
+            font-size: 1.5rem;
+            margin: 0.5rem 0;
+            color: var(--ut-orange);
+        }
+
+        .member-role {
+            font-weight: bold;
+            color: #666;
+            margin-bottom: 1rem;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 0.6rem 1.2rem;
+            background-color: var(--ut-orange);
+            color: white;
+            text-decoration: none;
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>🏓 UT Table Tennis Team</h1>
+    <p>Hook 'em Horns! 追求卓越，乒出精彩</p>
+</header>
+
+<div class="container">
+    <div class="team-grid">
+        
+        <div class="member-card">
+            <div class="member-photo" style="background-image: url('https://via.placeholder.com/300x250'); background-size: cover;"></div>
+            <div class="member-info">
+                <div class="member-name">张三 (Longhorn Zhang)</div>
+                <div class="member-role">队长 / 右手横板快攻</div>
+                <p>三届校内赛冠军，擅长暴力弧圈球。</p>
+                <a href="profile-zhang.html" class="btn">查看个人主页</a>
+            </div>
+        </div>
+
+        <div class="member-card">
+            <div class="member-photo" style="background-image: url('https://via.placeholder.com/300x250'); background-size: cover;"></div>
+            <div class="member-info">
+                <div class="member-name">李四 (Emma Li)</div>
+                <div class="member-role">副队长 / 左手直板长胶</div>
+                <p>防守稳如泰山，校队头号“发球机”。</p>
+                <a href="profile-li.html" class="btn">查看个人主页</a>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+</body>
+</html>
