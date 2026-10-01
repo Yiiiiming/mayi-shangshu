@@ -1,4 +1,5 @@
-import { Game, WORLD } from './engine.mjs?v=power-wall-1';
+import { Game, WORLD } from './engine.mjs?v=bilingual-1';
+import { locales } from './locales.mjs?v=bilingual-1';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('game');
@@ -8,7 +9,10 @@ const keys = new Set();
 const touch = [{}, {}];
 const touchPointers = new Map();
 const colors = ['#2364dc', '#e56047'];
-const names = ['蓝方', '红方'];
+let language = null;
+let languageSelected = false;
+let copy = locales.en;
+let names = [copy.blue, copy.red];
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 let paused = false;
 let soundEnabled = true;
@@ -25,7 +29,6 @@ let transientUntil = 0;
 let focusAfterOverlay = false;
 
 try { soundEnabled = localStorage.getItem('stick-badminton-sound') !== 'off'; } catch { /* Storage is optional. */ }
-updateSoundLabel();
 
 function sound(type) {
   if (!soundEnabled) return;
@@ -49,11 +52,51 @@ function sound(type) {
   } catch { /* Keep playing if this browser does not provide audio. */ }
 }
 
+function applyLanguage() {
+  document.documentElement.lang = copy.lang;
+  document.title = copy.title;
+  $('page-description').setAttribute('content', copy.description);
+  for (const node of document.querySelectorAll('[data-i18n]')) node.textContent = copy[node.dataset.i18n];
+  for (const node of document.querySelectorAll('[data-i18n-aria]')) node.setAttribute('aria-label', copy[node.dataset.i18nAria]);
+  for (const node of document.querySelectorAll('[data-i18n-title]')) node.setAttribute('title', copy[node.dataset.i18nTitle]);
+  const actions = ['left', 'right', 'jump', 'hit', 'power'];
+  document.querySelectorAll('[data-action]').forEach((button) => {
+    button.setAttribute('aria-label', copy.touchLabels[Number(button.dataset.player)][actions.indexOf(button.dataset.action)]);
+    const label = { jump: 'touchJump', hit: 'touchHit', power: 'touchPower' }[button.dataset.action];
+    if (label) button.textContent = copy[label];
+  });
+  $('fullscreen-label').textContent = document.fullscreenElement ? copy.exitFullscreen : copy.fullscreen;
+  $('power-label').textContent = copy.powerIdle;
+  updateSoundLabel();
+}
+function chooseLanguage(value) {
+  if (!locales[value]) return;
+  language = value; copy = locales[value]; names = [copy.blue, copy.red];
+  languageSelected = true;
+  clearInputs(); applyLanguage();
+  $('live-status').textContent = '';
+  lastUI = ''; last = performance.now();
+  syncUI();
+  $('start').focus({ preventScroll: true });
+}
+function showLanguageChoice() {
+  clearInputs();
+  if (game.phase !== 'ready' && game.phase !== 'over') paused = true;
+  languageSelected = false;
+  lastUI = '';
+  syncUI();
+  $(`choose-${language || 'zh'}`).focus({ preventScroll: true });
+}
+$('choose-zh').addEventListener('click', () => chooseLanguage('zh'));
+$('choose-en').addEventListener('click', () => chooseLanguage('en'));
+$('lang-switch').addEventListener('click', showLanguageChoice);
+
 function updateSoundLabel() {
   $('sound').setAttribute('aria-pressed', String(soundEnabled));
-  $('sound').querySelector('span').textContent = soundEnabled ? '开' : '关';
+  $('sound').querySelector('span').textContent = soundEnabled ? copy.on : copy.off;
 }
 function toggleSound() {
+  if (!languageSelected) return;
   soundEnabled = !soundEnabled;
   updateSoundLabel();
   try { localStorage.setItem('stick-badminton-sound', soundEnabled ? 'on' : 'off'); } catch { /* Optional preference. */ }
@@ -66,6 +109,7 @@ function clearInputs() {
   document.querySelectorAll('.pressed').forEach((button) => button.classList.remove('pressed'));
 }
 function start() {
+  if (!languageSelected) return;
   clearInputs();
   if (paused) paused = false;
   else { game.start(); particles = []; transient = ''; }
@@ -75,14 +119,14 @@ function start() {
   canvas.focus({ preventScroll: true });
 }
 function togglePause() {
-  if (game.phase === 'ready' || game.phase === 'over') return;
+  if (!languageSelected || game.phase === 'ready' || game.phase === 'over') return;
   paused = !paused;
   clearInputs();
   syncUI();
   if (!paused) canvas.focus({ preventScroll: true });
   else $('start').focus({ preventScroll: true });
 }
-function restart() { paused = false; game.reset(); clearInputs(); particles = []; transient = ''; syncUI(); $('start').focus({ preventScroll: true }); }
+function restart() { if (!languageSelected) return; paused = false; game.reset(); clearInputs(); particles = []; transient = ''; syncUI(); $('start').focus({ preventScroll: true }); }
 
 $('start').addEventListener('click', start);
 $('restart').addEventListener('click', restart);
@@ -90,17 +134,18 @@ $('pause').addEventListener('click', togglePause);
 $('sound').addEventListener('click', toggleSound);
 if (!document.fullscreenEnabled || window.matchMedia('(pointer: coarse)').matches) $('fullscreen').hidden = true;
 $('fullscreen').addEventListener('click', async () => {
+  if (!languageSelected) return;
   try { if (document.fullscreenElement) await document.exitFullscreen(); else await $('arena').requestFullscreen(); }
-  catch { $('live-status').textContent = '当前浏览器暂不支持全屏，可以放大浏览器窗口游玩。'; }
+  catch { $('live-status').textContent = copy.fullscreenError; }
 });
 document.addEventListener('fullscreenchange', () => {
-  $('fullscreen').firstChild.textContent = document.fullscreenElement ? '退出 ' : '全屏 ';
+  $('fullscreen-label').textContent = document.fullscreenElement ? copy.exitFullscreen : copy.fullscreen;
   canvas.focus({ preventScroll: true });
 });
 
-const controlled = new Set(['KeyA', 'KeyD', 'KeyW', 'KeyS', 'KeyF', 'KeyE', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyK', 'Slash', 'NumpadDivide', 'Space', 'KeyP', 'Escape', 'KeyM', 'KeyR']);
+const controlled = new Set(['KeyA', 'KeyD', 'KeyW', 'KeyS', 'KeyF', 'KeyE', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyK', 'Slash', 'NumpadDivide', 'Space', 'KeyP', 'Escape', 'KeyM']);
 window.addEventListener('keydown', (event) => {
-  if (event.ctrlKey || event.metaKey || event.altKey || !controlled.has(event.code)) return;
+  if (!languageSelected || event.ctrlKey || event.metaKey || event.altKey || !controlled.has(event.code)) return;
   if (event.target instanceof HTMLElement && event.target.matches('input, textarea, select, [contenteditable="true"]')) return;
   if (event.code === 'Space' && event.target instanceof HTMLButtonElement) return;
   event.preventDefault();
@@ -111,12 +156,11 @@ window.addEventListener('keydown', (event) => {
   if (event.code === 'Space' && (game.phase === 'ready' || game.phase === 'over' || paused)) start();
   if (event.code === 'KeyP' || event.code === 'Escape') togglePause();
   if (event.code === 'KeyM') toggleSound();
-  if (event.code === 'KeyR') restart();
 });
 window.addEventListener('keyup', (event) => {
   keys.delete(event.code);
   if (event.code === 'Space' && event.target instanceof HTMLButtonElement) return;
-  if (controlled.has(event.code) && !(event.ctrlKey || event.metaKey || event.altKey)) event.preventDefault();
+  if (languageSelected && controlled.has(event.code) && !(event.ctrlKey || event.metaKey || event.altKey)) event.preventDefault();
 });
 function suspend() { clearInputs(); if (game.phase !== 'ready' && game.phase !== 'over' && !paused) togglePause(); }
 window.addEventListener('blur', suspend);
@@ -124,6 +168,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) suspe
 
 document.querySelectorAll('[data-action]').forEach((button) => {
   button.addEventListener('pointerdown', (event) => {
+    if (!languageSelected || paused) return;
     event.preventDefault();
     const side = Number(button.dataset.player), action = button.dataset.action;
     button.setPointerCapture(event.pointerId);
@@ -152,6 +197,14 @@ function inputs() {
 }
 
 function syncUI() {
+  $('language-screen').hidden = languageSelected;
+  $('game-shell').hidden = !languageSelected;
+  $('game-shell').inert = !languageSelected;
+  if (!languageSelected) {
+    $('overlay').hidden = true;
+    $('serve-power').hidden = true;
+    return;
+  }
   const showPower = game.phase === 'serve' && !paused;
   $('serve-power').hidden = !showPower;
   if (showPower) {
@@ -160,9 +213,9 @@ function syncUI() {
     $('power-fill').style.transform = `scaleX(${game.serveCharge})`;
     $('power-value').textContent = `${percent}%`;
     $('power-meter').setAttribute('aria-valuenow', String(percent));
-    $('power-label').textContent = game.serveCharging ? (percent === 100 ? '已蓄满 · 松开发球' : '蓄力中 · 松开发球') : '按住蓄力 · 松开发球';
+    $('power-label').textContent = game.serveCharging ? (percent === 100 ? copy.powerFull : copy.powerCharging) : copy.powerIdle;
   }
-  const stamp = [game.phase, game.score, game.server, game.rally, game.serveCharging, paused, transient, time < transientUntil].join('|');
+  const stamp = [language, game.phase, game.score, game.server, game.rally, game.serveCharging, paused, transient, time < transientUntil].join('|');
   if (stamp === lastUI) return;
   lastUI = stamp;
   for (let side = 0; side < 2; side++) {
@@ -170,7 +223,7 @@ function syncUI() {
     $(`serve-${side}`).hidden = game.server !== side || game.phase === 'ready' || game.phase === 'over';
   }
   $('pause').hidden = game.phase === 'ready' || game.phase === 'over';
-  $('pause').setAttribute('aria-label', paused ? '继续游戏' : '暂停游戏');
+  $('pause').setAttribute('aria-label', paused ? copy.resumeGame : copy.pauseGame);
   $('pause').textContent = paused ? '▷' : 'Ⅱ';
   $('rally').hidden = game.rally < 3 || paused;
   $('rally').querySelector('b').textContent = game.rally;
@@ -178,38 +231,38 @@ function syncUI() {
   $('overlay').hidden = !isOverlay;
   $('announcement').replaceChildren();
   if (paused) {
-    $('overlay-label').textContent = 'TIME OUT / 中场休息';
-    $('overlay-title').innerHTML = '歇口气，<br>再接着打。';
-    $('overlay-copy').textContent = '比赛已暂停，比分和球的位置都会保留。';
-    $('start').innerHTML = '继续比赛 <span>↗</span>';
-    $('start-hint').textContent = '空格 / P / Esc 继续';
-    $('court-status').textContent = '比赛暂停';
+    $('overlay-label').textContent = copy.pausedLabel;
+    $('overlay-title').innerHTML = copy.pausedTitle;
+    $('overlay-copy').textContent = copy.pausedCopy;
+    $('start').innerHTML = `${copy.resume} <span>↗</span>`;
+    $('start-hint').textContent = copy.resumeHint;
+    $('court-status').textContent = copy.pausedStatus;
   } else if (game.phase === 'over') {
-    $('overlay-label').textContent = `WINNER / PLAYER ${game.winner + 1}`;
-    $('overlay-title').innerHTML = `${names[game.winner]}赢了！<br>${game.score[0]} <span style="color:#f9dc55">:</span> ${game.score[1]}`;
-    $('overlay-copy').textContent = `打得漂亮！本场最长 ${game.longestRally} 拍。交换位置，再比一局？`;
-    $('start').innerHTML = '再来一局 <span>↗</span>';
-    $('start-hint').textContent = '也可以按空格重新开始';
-    $('court-status').textContent = `${names[game.winner]}获胜 · GG!`;
+    $('overlay-label').textContent = copy.winnerLabel(game.winner + 1);
+    $('overlay-title').innerHTML = `${copy.winnerTitle(names[game.winner])}<br>${game.score[0]} <span style="color:#f9dc55">:</span> ${game.score[1]}`;
+    $('overlay-copy').textContent = copy.winnerCopy(game.longestRally);
+    $('start').innerHTML = `${copy.again} <span>↗</span>`;
+    $('start-hint').textContent = copy.againHint;
+    $('court-status').textContent = copy.winnerStatus(names[game.winner]);
     if (focusAfterOverlay) { $('start').focus({ preventScroll: true }); focusAfterOverlay = false; }
   } else if (game.phase === 'ready') {
-    $('overlay-label').textContent = '一起上场 / TWO PLAYER';
-    $('overlay-title').innerHTML = '这一球，<br>谁也别让。';
-    $('overlay-copy').innerHTML = '叫上你的搭档，共用一块键盘。<br>先拿 11 分，赢下这一局。';
-    $('start').innerHTML = '开始对决 <span>↗</span>';
-    $('start-hint').textContent = '也可以按空格开始';
-    $('court-status').textContent = '等待两位选手入场';
+    $('overlay-label').textContent = copy.readyLabel;
+    $('overlay-title').innerHTML = copy.readyTitle;
+    $('overlay-copy').innerHTML = copy.readyCopy;
+    $('start').innerHTML = `${copy.start} <span>↗</span>`;
+    $('start-hint').textContent = copy.startHint;
+    $('court-status').textContent = copy.readyStatus;
   } else {
     if (game.phase === 'serve') {
-      $('announcement').textContent = `${names[game.server]}发球`;
+      $('announcement').textContent = copy.serve(names[game.server]);
       const small = document.createElement('small');
-      small.textContent = game.server === 0 ? '按住 S（或 F）蓄力，松开发球' : '按住 ↓（或 K）蓄力，松开发球';
+      small.textContent = copy.serveHint(game.server === 0 ? 'S' : '↓', game.server === 0 ? 'F' : 'K');
       $('announcement').append(small);
     } else if (game.phase === 'point') {
       $('announcement').textContent = `${names[game.server]} +1`;
-      const small = document.createElement('small'); small.textContent = game.pointReason; $('announcement').append(small);
-    } else if (time < transientUntil) $('announcement').textContent = transient;
-    $('court-status').textContent = game.phase === 'serve' ? '轻点发近球 · 蓄满冲后墙' : game.phase === 'point' ? '下一球，由得分方发球' : '身前快攻 · 身后挑高 · 后墙反弹';
+      const small = document.createElement('small'); small.textContent = copy.reasons[game.pointReason] || copy.pointFallback; $('announcement').append(small);
+    } else if (time < transientUntil) $('announcement').textContent = copy[transient] || '';
+    $('court-status').textContent = game.phase === 'serve' ? copy.serveStatus : game.phase === 'point' ? copy.pointStatus : copy.playingStatus;
   }
 }
 
@@ -248,13 +301,13 @@ function drawCourt() {
   line([[550, 390], [550, 553]], '#d8e6c3', 2);
   ctx.save(); ctx.globalAlpha = 0.12;
   textLabel('STICK CLUB', 278, 577, '900 27px sans-serif', '#143c2d');
-  textLabel('BADMINTON', 837, 577, '900 27px sans-serif', '#143c2d');
+  textLabel(copy.courtSport, 837, 577, '900 27px sans-serif', '#143c2d');
   ctx.restore();
   // Court-side signs, part of the stadium rather than an extra interface.
   roundRect(80, 366, 111, 27, 2, '#e9e9d2');
-  textLabel('PLAY FOR FUN', 135, 384, '700 10px sans-serif', '#527661');
+  textLabel(copy.playForFun, 135, 384, '700 10px sans-serif', '#527661');
   roundRect(912, 366, 111, 27, 2, '#eee1ad');
-  textLabel('GOOD LUCK!', 968, 384, '700 10px sans-serif', '#746531');
+  textLabel(copy.goodLuck, 968, 384, '700 10px sans-serif', '#746531');
 }
 
 function drawNet() {
@@ -374,15 +427,15 @@ function events() {
     if (event.type === 'hit' || event.type === 'serve' || event.type === 'power') {
       emitParticles(game.shuttle.x, game.shuttle.y, event.type === 'power' ? '#f9dc55' : '#fff9dd');
       hitFlash = .08;
-      if (event.type === 'power') { shake = .14; transient = '大力击球！'; transientUntil = time + .52; }
+      if (event.type === 'power') { shake = .14; transient = 'powerShot'; transientUntil = time + .52; }
     }
     if (event.type === 'point') {
       emitParticles(game.shuttle.x, WORLD.floorY - 8, colors[event.player], 20);
-      $('live-status').textContent = `${names[event.player]}得分，${game.score[0]} 比 ${game.score[1]}。${names[game.server]}发球。`;
+      $('live-status').textContent = copy.pointLive(names[event.player], game.score, names[game.server]);
     }
     if (event.type === 'win') {
       emitParticles(400, 180, colors[event.player], 35); emitParticles(700, 180, '#f9dc55', 35);
-      $('live-status').textContent = `${names[event.player]}获胜！最终比分 ${game.score[0]} 比 ${game.score[1]}。`;
+      $('live-status').textContent = copy.winLive(names[event.player], game.score);
     }
   }
 }
@@ -411,11 +464,11 @@ function draw(dt) {
 }
 function frame(now) {
   const dt = Math.min((now - (last || now)) / 1000, .04); last = now;
-  if (!paused && !document.hidden) { time += dt; game.update(dt, inputs()); events(); shake = Math.max(0, shake - dt); hitFlash = Math.max(0, hitFlash - dt); for (let side = 0; side < 2; side++) wallFlash[side] = Math.max(0, wallFlash[side] - dt); }
-  syncUI(); draw(dt);
+  if (languageSelected && !paused && !document.hidden) { time += dt; game.update(dt, inputs()); events(); shake = Math.max(0, shake - dt); hitFlash = Math.max(0, hitFlash - dt); for (let side = 0; side < 2; side++) wallFlash[side] = Math.max(0, wallFlash[side] - dt); }
+  syncUI(); if (languageSelected) draw(dt);
   requestAnimationFrame(frame);
 }
 
 // Read-only snapshot for support and repeatable browser verification.
-window.badminton = Object.freeze({ snapshot: () => ({ phase: game.phase, score: [...game.score], paused, server: game.server, serveCharge: game.serveCharge, serveCharging: game.serveCharging, lastHitter: game.lastHitter, rally: game.rally, longestRally: game.longestRally, players: game.players.map(({ x, y, shot }) => ({ x, y, shot })), shuttle: { x: game.shuttle.x, y: game.shuttle.y, vx: game.shuttle.vx, vy: game.shuttle.vy, active: game.shuttle.active }, winner: game.winner }) });
+window.badminton = Object.freeze({ snapshot: () => ({ language, languageSelected, phase: game.phase, score: [...game.score], paused, server: game.server, serveCharge: game.serveCharge, serveCharging: game.serveCharging, lastHitter: game.lastHitter, rally: game.rally, longestRally: game.longestRally, players: game.players.map(({ x, y, shot }) => ({ x, y, shot })), shuttle: { x: game.shuttle.x, y: game.shuttle.y, vx: game.shuttle.vx, vy: game.shuttle.vy, active: game.shuttle.active }, winner: game.winner }) });
 syncUI(); requestAnimationFrame(frame);
