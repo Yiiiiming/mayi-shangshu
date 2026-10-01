@@ -70,7 +70,7 @@ export class Game {
   }
 
   _step(dt, inputs) {
-    const actionDown = [0, 1].map((side) => Boolean(inputs[side]?.hit || inputs[side]?.smash));
+    const actionDown = [0, 1].map((side) => Boolean(inputs[side]?.hit));
     const pressed = actionDown.map((down, side) => down && !this._actionDown[side]);
     const released = actionDown.map((down, side) => !down && this._actionDown[side]);
     this._actionDown = actionDown;
@@ -112,7 +112,7 @@ export class Game {
     }
     if (this.phase !== 'playing') return;
 
-    // Test contact on both ends of the short physics step. Even a quick smash
+    // Test contact on both ends of the short physics step. Even a quick power shot
     // remains catchable when the display is rendering at a lower frame rate.
     this._tryHits();
     const shuttle = this.shuttle;
@@ -178,8 +178,8 @@ export class Game {
 
     if (input.jump && !player._jumpWasDown) player._jumpBuffer = 0.13;
     player._jumpWasDown = Boolean(input.jump);
-    if (this.phase === 'playing' && (input.hit || input.smash)) {
-      player._requestedShot = input.smash ? 'smash' : 'hit';
+    if (this.phase === 'playing' && (input.hit || input.power)) {
+      player._requestedShot = input.power ? 'power' : 'hit';
       if (player._attackCooldown <= 0) {
         player._attackBuffer = 0.18;
         player.swing = 1;
@@ -236,38 +236,57 @@ export class Game {
     const forwardSpeed = player.vx * direction;
     const incomingSpeed = clamp(-shuttle.vx * direction, -900, 900);
     const incomingFall = clamp(shuttle.vy, -700, 700);
-    const attacking = !serving && player._requestedShot === 'smash'
-      && shuttle.y < WORLD.netTop + 15 && height > 45;
+    const attacking = !serving && player._requestedShot === 'power';
     let horizontal;
     let vertical;
     const charge = serving ? this.serveCharge : 0;
+    const maximumLift = Math.sqrt(2 * GRAVITY * Math.max(0, shuttle.y - 104));
 
     if (serving) {
-      // At the default standing position this ranges from a short serve
-      // near x=651 to a deep serve near x=1034 (mirrored for the right side).
-      horizontal = 215 + charge * 195 + forwardSpeed * 0.08;
-      vertical = -510 - charge * 60 + player.vy * 0.07;
+      // A tap drops just beyond the net. A full charge has enough horizontal
+      // momentum to hit the back wall well before landing; the middle stays
+      // useful for a conventional deep serve.
+      horizontal = 170 + Math.pow(charge, 2.5) * 730 + forwardSpeed * 0.08;
+      vertical = -600 + charge * 20 + player.vy * 0.07;
     } else if (attacking) {
-      // A clean contact in front transfers more forward momentum and angles
-      // the racket downward. A ball behind the shoulder gets a weaker lift.
-      horizontal = 610 + front * 190 + forwardSpeed * 0.36 + incomingSpeed * 0.11;
-      vertical = -105 + front * 180 + highContact * 185
-        + incomingFall * 0.10 + player.vy * 0.09 - behind * 75;
+      // Power is an offensive drive/clear from either the ground or the air.
+      // Contact and running momentum still change its speed and natural arc.
+      horizontal = clamp(980 + front * 170 + forwardSpeed * 0.26 + incomingSpeed * 0.10, 650, 1250);
+      vertical = -280 + front * 70 + highContact * 125
+        + incomingFall * 0.035 + player.vy * 0.06 - behind * 40;
+      const netDistance = (WORLD.netX - shuttle.x) * direction;
+      const wallDistance = ((side === 0 ? WORLD.wallRight : WORLD.wallLeft) - shuttle.x) * direction;
+      const clearHeight = WORLD.netTop - 16;
+
+      // A low contact needs enough time to rise above the tape. Slow a very
+      // close power shot instead of demanding an invisible offscreen arc.
+      if (netDistance > 0 && shuttle.y > clearHeight && maximumLift > 0) {
+        const earliestRise = (maximumLift - Math.sqrt(Math.max(0,
+          maximumLift * maximumLift - 2 * GRAVITY * (shuttle.y - clearHeight)))) / GRAVITY;
+        if (earliestRise > 0) horizontal = Math.max(170, Math.min(horizontal, netDistance / earliestRise * 0.97));
+      }
+      if (netDistance > 0) {
+        const netTime = netDistance / horizontal;
+        const liftForNet = (clearHeight - shuttle.y - 0.5 * GRAVITY * netTime * netTime) / netTime;
+        vertical = Math.min(vertical, liftForNet);
+      }
+      const wallTime = wallDistance / horizontal;
+      const liftForWall = (WORLD.floorY - 90 - shuttle.y - 0.5 * GRAVITY * wallTime * wallTime) / wallTime;
+      vertical = Math.min(vertical, liftForWall);
     } else {
       horizontal = 390 + front * 160 + forwardSpeed * 0.38 + incomingSpeed * 0.10;
       vertical = -525 + front * 85 + (height - 75) * 0.95
         + highContact * 180 + incomingFall * 0.09 + player.vy * 0.12 - behind * 55;
     }
 
-    // Keep high recovery lobs visible without steering them to a target or
-    // guaranteeing net clearance. Contact quality decides where a shot lands.
-    const maximumLift = Math.sqrt(2 * GRAVITY * Math.max(0, shuttle.y - 104));
-    shuttle.vx = direction * clamp(horizontal, 170, 950);
+    // Keep high recovery lobs visible. Normal returns retain their entirely
+    // contact-driven arc; an impossibly late low power shot can still net.
+    shuttle.vx = direction * clamp(horizontal, 170, attacking || serving ? 1250 : 950);
     shuttle.vy = clamp(vertical, -maximumLift, 340);
     shuttle.active = true;
     shuttle.trail.length = 0;
     player.swing = 1;
-    player.shot = attacking ? 'smash' : 'hit';
+    player.shot = attacking ? 'power' : 'hit';
     player._hitCooldown = 0.23;
     player._attackBuffer = 0;
     this.lastHitter = side;
@@ -279,10 +298,10 @@ export class Game {
     this.pointReason = '';
     this.rally += 1;
     this.longestRally = Math.max(this.longestRally, this.rally);
-    this.message = attacking ? `${NAMES[side]}扣杀！` : '看准来球，挥拍！';
+    this.message = attacking ? `${NAMES[side]}强力球！` : '看准来球，挥拍！';
     this._emit(serving
       ? { type: 'serve', player: side, charge }
-      : { type: attacking ? 'smash' : 'hit', player: side });
+      : { type: attacking ? 'power' : 'hit', player: side });
   }
 
   _awardPoint(winner, reason) {

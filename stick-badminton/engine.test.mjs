@@ -145,7 +145,7 @@ test('both back walls reflect horizontal velocity, preserve vertical motion, and
   }
 });
 
-test('high smash is faster than a normal clear and clears the tape', () => {
+test('an aerial power shot is faster than a normal clear and clears the tape', () => {
   const makeContact = (shot) => {
     const game = new Game();
     game.start();
@@ -157,12 +157,12 @@ test('high smash is faster than a normal clear and clears the tape', () => {
     return game;
   };
   const normal = makeContact('hit');
-  const smash = makeContact('smash');
-  assert.equal(smash.players[0].shot, 'smash');
-  assert.ok(smash.shuttle.vx > normal.shuttle.vx * 1.5);
-  while (smash.shuttle.x < WORLD.netX && smash.phase === 'playing') smash.update(1 / 120);
-  assert.ok(smash.shuttle.y < WORLD.netTop - 10);
-  assert.ok(smash.events.some((event) => event.type === 'smash'));
+  const power = makeContact('power');
+  assert.equal(power.players[0].shot, 'power');
+  assert.ok(power.shuttle.vx > normal.shuttle.vx * 1.5);
+  while (power.shuttle.x < WORLD.netX && power.phase === 'playing') power.update(1 / 120);
+  assert.ok(power.shuttle.y < WORLD.netTop - 10);
+  assert.ok(power.events.some((event) => event.type === 'power'));
 });
 
 test('invalid and resumed-tab timesteps do not corrupt or skip the match', () => {
@@ -269,13 +269,53 @@ test('contact-dependent physics mirror exactly between blue and red players', ()
   assert.ok(Math.abs(left.shuttle.y - right.shuttle.y) < 0.000001);
 });
 
-test('charge-and-release works for both players with either attack input', () => {
+test('grounded, aerial, backcourt, and high front-court power contacts hit the opposite wall on both sides', () => {
+  for (const side of [0, 1]) {
+    for (const [x, feet, ballY] of [[320, 500, 400], [120, 500, 400], [440, 500, 400], [320, 385, 260], [485, 385, 260]]) {
+      const game = new Game();
+      game.start();
+      game.phase = 'playing';
+      game.lastHitter = 1 - side;
+      const direction = side ? -1 : 1;
+      Object.assign(game.players[side], { x: side ? WORLD.width - x : x, y: feet, vx: 0, vy: 0 });
+      Object.assign(game.shuttle, { x: game.players[side].x + 25 * direction, y: ballY, vx: -300 * direction, vy: 120, active: true });
+      const inputs = [{}, {}];
+      inputs[side] = { power: true };
+      game.update(1 / 240, inputs);
+      assert.equal(game.players[side].shot, 'power');
+      assert.ok(game.events.some((event) => event.type === 'power' && event.player === side));
+      for (let frame = 0; frame < 600 && game.phase === 'playing' && !game.events.some((event) => event.type === 'wall'); frame += 1) game.update(1 / 120);
+      assert.ok(!game.events.some((event) => event.type === 'net'), `unexpected net: side=${side}, x=${x}, ballY=${ballY}`);
+      assert.ok(game.events.some((event) => event.type === 'wall' && event.side === 1 - side), `no wall: side=${side}, x=${x}, ballY=${ballY}`);
+      assert.equal(game.phase, 'playing');
+      assert.ok(game.shuttle.y < WORLD.floorY - 20);
+    }
+  }
+});
+
+test('removed smash input has no effect during either a rally or serving', () => {
+  const game = new Game();
+  game.start();
+  advance(game, 1.4, [{ smash: true }, {}]);
+  game.update(1 / 120);
+  assert.equal(game.phase, 'serve');
+  assert.equal(game.serveCharge, 0);
+  game.phase = 'playing';
+  game.lastHitter = 1;
+  Object.assign(game.shuttle, { x: 290, y: 400, vx: -50, vy: 0, active: true });
+  game.update(1 / 120, [{ smash: true }, {}]);
+  assert.equal(game.lastHitter, 1);
+  assert.ok(game.shuttle.vx < 0);
+  assert.equal(game.players[0].swing, 0);
+});
+
+test('charge-and-release works for both players using the normal hit input', () => {
   for (const side of [0, 1]) {
     const game = new Game();
     game.start();
     game.server = side;
     const inputs = [{}, {}];
-    inputs[side] = side ? { smash: true } : { hit: true };
+    inputs[side] = { hit: true };
     inputs[1 - side] = { hit: true };
     advance(game, 0.7, inputs);
     assert.equal(game.phase, 'serve');
@@ -291,21 +331,33 @@ test('charge-and-release works for both players with either attack input', () =>
   }
 });
 
-test('short, medium, and full charges land progressively farther while every baseline serve clears the net', () => {
-  const landings = [];
-  for (const duration of [0.05, 0.6, 1.3]) {
-    const game = new Game();
-    game.start();
-    serve(game, duration);
-    for (let frame = 0; frame < 600 && game.phase === 'playing'; frame += 1) game.update(1 / 120);
-    assert.equal(game.phase, 'point');
-    assert.ok(!game.events.some((event) => event.type === 'net' || event.type === 'wall'));
-    assert.deepEqual(game.score, [1, 0]);
-    landings.push(game.shuttle.x);
+test('a tap serves just past the net, half charge serves deep, and full charge hits the opposite wall', () => {
+  for (const side of [0, 1]) {
+    const landings = [];
+    for (const duration of [0.05, 0.6, 1.3]) {
+      const game = new Game();
+      game.start();
+      game.server = side;
+      serve(game, duration);
+      let wallHeight = null;
+      for (let frame = 0; frame < 600 && game.phase === 'playing'; frame += 1) {
+        game.update(1 / 120);
+        if (game.events.some((event) => event.type === 'wall')) { wallHeight = game.shuttle.y; break; }
+      }
+      assert.ok(!game.events.some((event) => event.type === 'net'));
+      if (duration < 1) {
+        assert.equal(game.phase, 'point');
+        assert.equal(wallHeight, null);
+        landings.push(side ? WORLD.width - game.shuttle.x : game.shuttle.x);
+      } else {
+        assert.equal(game.phase, 'playing');
+        assert.ok(wallHeight > 104 && wallHeight < 400, `full serve should hit well above the floor: ${wallHeight}`);
+        assert.ok(game.events.some((event) => event.type === 'wall' && event.side === 1 - side));
+      }
+    }
+    assert.ok(landings[0] >= 610 && landings[0] <= 650, `short landing ${landings[0]}`);
+    assert.ok(landings[1] >= 810 && landings[1] <= 880, `half-charge landing ${landings[1]}`);
   }
-  assert.ok(landings[0] >= 640 && landings[0] <= 690, `short landing ${landings[0]}`);
-  assert.ok(landings[2] >= 990 && landings[2] <= 1040, `full landing ${landings[2]}`);
-  assert.ok(landings[1] > landings[0] + 100 && landings[2] > landings[1] + 100);
 });
 
 test('full charge is capped and never fires automatically while held', () => {
@@ -322,17 +374,19 @@ test('full charge is capped and never fires automatically while held', () => {
   assert.equal(game.events.find((event) => event.type === 'serve').charge, 1);
 });
 
-test('multiple attack controls form one charge and only their final release launches it', () => {
+test('power does not charge a serve or delay the release of normal hit', () => {
   const game = new Game();
   game.start();
+  advance(game, 0.7, [{ power: true }, {}]);
+  assert.equal(game.serveCharging, false);
+  assert.equal(game.serveCharge, 0);
   advance(game, 0.25, [{ hit: true }, {}]);
-  advance(game, 0.25, [{ hit: true, smash: true }, {}]);
-  advance(game, 0.25, [{ smash: true }, {}]);
+  advance(game, 0.25, [{ hit: true, power: true }, {}]);
   assert.equal(game.phase, 'serve');
-  assert.ok(game.serveCharge > 0.6);
+  assert.ok(game.serveCharge > 0.4);
   assert.equal(game.serveCharging, true);
   assert.equal(game.players[0].swing, 0, 'holding a charge should not repeatedly swing');
-  game.update(1 / 120);
+  game.update(1 / 120, [{ power: true }, {}]);
   assert.equal(game.phase, 'playing');
   assert.equal(game.events.filter((event) => event.type === 'serve').length, 1);
 });
@@ -343,7 +397,7 @@ test('the non-server cannot charge or release a serve', () => {
     game.start();
     game.server = side;
     const inputs = [{}, {}];
-    inputs[1 - side] = { hit: true, smash: true };
+    inputs[1 - side] = { hit: true, power: true };
     advance(game, 1.5, inputs);
     game.update(1 / 60);
     assert.equal(game.phase, 'serve');
@@ -437,7 +491,7 @@ test('long varied-input sessions remain finite, within the walls, and visibly on
   let totalPoints = 0;
   for (let frame = 0; frame < 30000; frame += 1) {
     if (game.phase === 'over') { totalPoints += game.score[0] + game.score[1]; game.start(); }
-    const inputs = [0, 1].map(() => ({ left: random() < 0.4, right: random() < 0.4, jump: random() < 0.08, hit: random() < 0.6, smash: random() < 0.2 }));
+    const inputs = [0, 1].map(() => ({ left: random() < 0.4, right: random() < 0.4, jump: random() < 0.08, hit: random() < 0.6, power: random() < 0.2 }));
     game.update(1 / 60, inputs);
     for (const value of [game.shuttle.x, game.shuttle.y, game.shuttle.vx, game.shuttle.vy]) assert.ok(Number.isFinite(value));
     assert.ok(game.shuttle.x >= WORLD.wallLeft - 0.01 && game.shuttle.x <= WORLD.wallRight + 0.01);

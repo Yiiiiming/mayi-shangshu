@@ -1,4 +1,4 @@
-import { Game, WORLD } from './engine.mjs?v=charge-serve-1';
+import { Game, WORLD } from './engine.mjs?v=power-wall-1';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('game');
@@ -32,12 +32,12 @@ function sound(type) {
   try {
     audio ||= new (window.AudioContext || window.webkitAudioContext)();
     if (audio.state === 'suspended') audio.resume().catch(() => {});
-    const notes = type === 'win' ? [523, 659, 784, 1047] : type === 'point' ? [523, 698] : type === 'smash' ? [160, 80] : type === 'wall' ? [240, 160] : type === 'net' ? [90] : [420, 680];
+    const notes = type === 'win' ? [523, 659, 784, 1047] : type === 'point' ? [523, 698] : type === 'power' ? [160, 80] : type === 'wall' ? [240, 160] : type === 'net' ? [90] : [420, 680];
     notes.forEach((freq, index) => {
       const oscillator = audio.createOscillator();
       const gain = audio.createGain();
       const start = audio.currentTime + index * (type === 'win' ? 0.12 : 0.045);
-      oscillator.type = type === 'smash' || type === 'net' ? 'triangle' : 'sine';
+      oscillator.type = type === 'power' || type === 'net' ? 'triangle' : 'sine';
       oscillator.frequency.setValueAtTime(freq, start);
       oscillator.frequency.exponentialRampToValueAtTime(freq * 0.7, start + 0.12);
       gain.gain.setValueAtTime(0, start);
@@ -98,7 +98,7 @@ document.addEventListener('fullscreenchange', () => {
   canvas.focus({ preventScroll: true });
 });
 
-const controlled = new Set(['KeyA', 'KeyD', 'KeyW', 'KeyS', 'KeyF', 'KeyG', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyK', 'KeyL', 'Space', 'KeyP', 'Escape', 'KeyM', 'KeyR']);
+const controlled = new Set(['KeyA', 'KeyD', 'KeyW', 'KeyS', 'KeyF', 'KeyE', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyK', 'Slash', 'NumpadDivide', 'Space', 'KeyP', 'Escape', 'KeyM', 'KeyR']);
 window.addEventListener('keydown', (event) => {
   if (event.ctrlKey || event.metaKey || event.altKey || !controlled.has(event.code)) return;
   if (event.target instanceof HTMLElement && event.target.matches('input, textarea, select, [contenteditable="true"]')) return;
@@ -133,7 +133,7 @@ document.querySelectorAll('[data-action]').forEach((button) => {
   const release = (event) => {
     const pointer = touchPointers.get(event.pointerId);
     if (!pointer) return;
-    if (event.type !== 'pointerup' && pointer.side === game.server && (pointer.action === 'hit' || pointer.action === 'smash')) game.cancelServeCharge();
+    if (event.type !== 'pointerup' && pointer.side === game.server && pointer.action === 'hit') game.cancelServeCharge();
     touchPointers.delete(event.pointerId);
     const stillHeld = [...touchPointers.values()].some((p) => p.side === pointer.side && p.action === pointer.action);
     touch[pointer.side][pointer.action] = stillHeld;
@@ -146,8 +146,8 @@ document.querySelectorAll('[data-action]').forEach((button) => {
 
 function inputs() {
   return [
-    { left: keys.has('KeyA'), right: keys.has('KeyD'), jump: keys.has('KeyW'), hit: keys.has('KeyS') || keys.has('KeyF'), smash: keys.has('KeyG') },
-    { left: keys.has('ArrowLeft'), right: keys.has('ArrowRight'), jump: keys.has('ArrowUp'), hit: keys.has('ArrowDown') || keys.has('KeyK'), smash: keys.has('KeyL') },
+    { left: keys.has('KeyA'), right: keys.has('KeyD'), jump: keys.has('KeyW'), hit: keys.has('KeyS') || keys.has('KeyF'), power: keys.has('KeyE') },
+    { left: keys.has('ArrowLeft'), right: keys.has('ArrowRight'), jump: keys.has('ArrowUp'), hit: keys.has('ArrowDown') || keys.has('KeyK'), power: keys.has('Slash') || keys.has('NumpadDivide') },
   ].map((input, side) => Object.fromEntries(Object.entries(input).map(([action, held]) => [action, held || Boolean(touch[side][action])])));
 }
 
@@ -209,7 +209,7 @@ function syncUI() {
       $('announcement').textContent = `${names[game.server]} +1`;
       const small = document.createElement('small'); small.textContent = game.pointReason; $('announcement').append(small);
     } else if (time < transientUntil) $('announcement').textContent = transient;
-    $('court-status').textContent = game.phase === 'serve' ? '短按发近球 · 长按发远球' : game.phase === 'point' ? '下一球，由得分方发球' : '身前快攻 · 身后挑高 · 后墙反弹';
+    $('court-status').textContent = game.phase === 'serve' ? '轻点发近球 · 蓄满冲后墙' : game.phase === 'point' ? '下一球，由得分方发球' : '身前快攻 · 身后挑高 · 后墙反弹';
   }
 }
 
@@ -314,7 +314,7 @@ function drawPlayer(player, side) {
   let angle = -0.67;
   if (game.phase === 'serve' && game.server === side && game.serveCharging) angle = -1.15 - game.serveCharge * 1.1;
   else if (player.swing > 0) angle = -2.5 + Math.sin(progress * Math.PI * .68) * 3.55;
-  if (player.shot === 'smash' && player.swing > 0) angle -= .25;
+  if (player.shot === 'power' && player.swing > 0) angle -= .08;
   const hand = [shoulder[0] + dir * Math.cos(angle) * 43, shoulder[1] + Math.sin(angle) * 43];
   const elbow = [shoulder[0] + dir * 18, shoulder[1] + (player.swing ? -8 : 17)];
   line([shoulder, elbow, hand], limb, 6);
@@ -371,10 +371,10 @@ function events() {
       wallFlash[event.side] = .25;
       emitParticles(game.shuttle.x, game.shuttle.y, '#f9dc55', 9);
     }
-    if (event.type === 'hit' || event.type === 'serve' || event.type === 'smash') {
-      emitParticles(game.shuttle.x, game.shuttle.y, event.type === 'smash' ? '#f9dc55' : '#fff9dd');
+    if (event.type === 'hit' || event.type === 'serve' || event.type === 'power') {
+      emitParticles(game.shuttle.x, game.shuttle.y, event.type === 'power' ? '#f9dc55' : '#fff9dd');
       hitFlash = .08;
-      if (event.type === 'smash') { shake = .14; transient = '好球！扣杀'; transientUntil = time + .52; }
+      if (event.type === 'power') { shake = .14; transient = '大力击球！'; transientUntil = time + .52; }
     }
     if (event.type === 'point') {
       emitParticles(game.shuttle.x, WORLD.floorY - 8, colors[event.player], 20);
@@ -417,5 +417,5 @@ function frame(now) {
 }
 
 // Read-only snapshot for support and repeatable browser verification.
-window.badminton = Object.freeze({ snapshot: () => ({ phase: game.phase, score: [...game.score], paused, server: game.server, serveCharge: game.serveCharge, serveCharging: game.serveCharging, rally: game.rally, longestRally: game.longestRally, players: game.players.map(({ x, y }) => ({ x, y })), shuttle: { x: game.shuttle.x, y: game.shuttle.y, vx: game.shuttle.vx, vy: game.shuttle.vy, active: game.shuttle.active }, winner: game.winner }) });
+window.badminton = Object.freeze({ snapshot: () => ({ phase: game.phase, score: [...game.score], paused, server: game.server, serveCharge: game.serveCharge, serveCharging: game.serveCharging, lastHitter: game.lastHitter, rally: game.rally, longestRally: game.longestRally, players: game.players.map(({ x, y, shot }) => ({ x, y, shot })), shuttle: { x: game.shuttle.x, y: game.shuttle.y, vx: game.shuttle.vx, vy: game.shuttle.vy, active: game.shuttle.active }, winner: game.winner }) });
 syncUI(); requestAnimationFrame(frame);
