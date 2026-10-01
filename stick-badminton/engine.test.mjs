@@ -3,7 +3,16 @@ import assert from 'node:assert/strict';
 import { Game, WORLD } from './engine.mjs';
 
 function advance(game, seconds, inputs = []) {
-  for (let elapsed = 0; elapsed < seconds; elapsed += 1 / 120) game.update(1 / 120, inputs);
+  for (let frame = 0; frame < Math.ceil(seconds * 120); frame += 1) game.update(1 / 120, inputs);
+}
+
+function serve(game, duration = 0.7, action = 'hit') {
+  const inputs = [{}, {}];
+  inputs[game.server][action] = true;
+  advance(game, duration, inputs);
+  game.update(1 / 120, []);
+  if (game.phase === 'serve') advance(game, Math.max(0, 0.49 - duration), []);
+  assert.equal(game.phase, 'playing');
 }
 
 function landOn(game, side) {
@@ -20,6 +29,9 @@ test('only the correct server can start; the serve clears the net', () => {
   advance(game, 0.7, [{}, { hit: true }]);
   assert.equal(game.phase, 'serve');
   game.update(1 / 60, [{ hit: true }, {}]);
+  assert.equal(game.phase, 'serve');
+  assert.equal(game.serveCharging, true);
+  game.update(1 / 120, [{}, {}]);
   assert.equal(game.phase, 'playing');
   assert.equal(game.lastHitter, 0);
   assert.equal(game.rally, 1);
@@ -31,6 +43,7 @@ test('only the correct server can start; the serve clears the net', () => {
 test('stationary held swings can return several shots but do not lock the game into a loop', () => {
   const game = new Game();
   game.start();
+  serve(game);
   advance(game, 80, [{ hit: true }, { hit: true }]);
   assert.ok(game.longestRally >= 3, `rally only reached ${game.longestRally}`);
   assert.ok(game.score[0] + game.score[1] > 0, 'footwork should be needed to keep returning every shot');
@@ -40,7 +53,7 @@ test('stationary held swings can return several shots but do not lock the game i
 test('a player cannot hit the shuttle twice in succession', () => {
   const game = new Game();
   game.start();
-  advance(game, 0.6, [{ hit: true }]);
+  serve(game);
   const rally = game.rally;
   Object.assign(game.shuttle, { x: 290, y: 430, vx: 0, vy: 0 });
   advance(game, 0.25, [{ hit: true }]);
@@ -254,6 +267,166 @@ test('contact-dependent physics mirror exactly between blue and red players', ()
   assert.ok(Math.abs(left.shuttle.vy - right.shuttle.vy) < 0.000001);
   assert.ok(Math.abs(left.shuttle.x + right.shuttle.x - WORLD.width) < 0.000001);
   assert.ok(Math.abs(left.shuttle.y - right.shuttle.y) < 0.000001);
+});
+
+test('charge-and-release works for both players with either attack input', () => {
+  for (const side of [0, 1]) {
+    const game = new Game();
+    game.start();
+    game.server = side;
+    const inputs = [{}, {}];
+    inputs[side] = side ? { smash: true } : { hit: true };
+    inputs[1 - side] = { hit: true };
+    advance(game, 0.7, inputs);
+    assert.equal(game.phase, 'serve');
+    assert.equal(game.serveCharging, true);
+    assert.ok(game.serveCharge > 0.5 && game.serveCharge < 0.65);
+    inputs[side] = {};
+    game.update(1 / 120, inputs);
+    assert.equal(game.phase, 'playing');
+    assert.equal(game.lastHitter, side);
+    assert.equal(game.serveCharge, 0);
+    assert.equal(game.serveCharging, false);
+    assert.ok(game.events.some((event) => event.type === 'serve' && event.player === side && event.charge > 0.5));
+  }
+});
+
+test('short, medium, and full charges land progressively farther while every baseline serve clears the net', () => {
+  const landings = [];
+  for (const duration of [0.05, 0.6, 1.3]) {
+    const game = new Game();
+    game.start();
+    serve(game, duration);
+    for (let frame = 0; frame < 600 && game.phase === 'playing'; frame += 1) game.update(1 / 120);
+    assert.equal(game.phase, 'point');
+    assert.ok(!game.events.some((event) => event.type === 'net' || event.type === 'wall'));
+    assert.deepEqual(game.score, [1, 0]);
+    landings.push(game.shuttle.x);
+  }
+  assert.ok(landings[0] >= 640 && landings[0] <= 690, `short landing ${landings[0]}`);
+  assert.ok(landings[2] >= 990 && landings[2] <= 1040, `full landing ${landings[2]}`);
+  assert.ok(landings[1] > landings[0] + 100 && landings[2] > landings[1] + 100);
+});
+
+test('full charge is capped and never fires automatically while held', () => {
+  const game = new Game();
+  game.start();
+  advance(game, 4, [{ hit: true }, {}]);
+  assert.equal(game.phase, 'serve');
+  assert.equal(game.serveCharge, 1);
+  assert.equal(game.serveCharging, true);
+  assert.equal(game.shuttle.active, false);
+  assert.ok(!game.events.some((event) => event.type === 'serve'));
+  game.update(1 / 120);
+  assert.equal(game.phase, 'playing');
+  assert.equal(game.events.find((event) => event.type === 'serve').charge, 1);
+});
+
+test('multiple attack controls form one charge and only their final release launches it', () => {
+  const game = new Game();
+  game.start();
+  advance(game, 0.25, [{ hit: true }, {}]);
+  advance(game, 0.25, [{ hit: true, smash: true }, {}]);
+  advance(game, 0.25, [{ smash: true }, {}]);
+  assert.equal(game.phase, 'serve');
+  assert.ok(game.serveCharge > 0.6);
+  assert.equal(game.serveCharging, true);
+  assert.equal(game.players[0].swing, 0, 'holding a charge should not repeatedly swing');
+  game.update(1 / 120);
+  assert.equal(game.phase, 'playing');
+  assert.equal(game.events.filter((event) => event.type === 'serve').length, 1);
+});
+
+test('the non-server cannot charge or release a serve', () => {
+  for (const side of [0, 1]) {
+    const game = new Game();
+    game.start();
+    game.server = side;
+    const inputs = [{}, {}];
+    inputs[1 - side] = { hit: true, smash: true };
+    advance(game, 1.5, inputs);
+    game.update(1 / 60);
+    assert.equal(game.phase, 'serve');
+    assert.equal(game.serveCharge, 0);
+    assert.equal(game.serveCharging, false);
+    assert.equal(game.rally, 0);
+  }
+});
+
+test('a quick press and release during the initial countdown is queued and fires once ready', () => {
+  const game = new Game();
+  game.start();
+  advance(game, 0.05, [{ hit: true }, {}]);
+  game.update(1 / 120);
+  assert.equal(game.phase, 'serve');
+  assert.equal(game.serveCharging, false);
+  assert.ok(game.serveCharge > 0);
+  advance(game, 0.3);
+  assert.equal(game.phase, 'serve');
+  advance(game, 0.15);
+  assert.equal(game.phase, 'playing');
+  assert.equal(game.events.filter((event) => event.type === 'serve').length, 1);
+});
+
+test('canceling charge prevents accidental release and requires a fresh press', () => {
+  const game = new Game();
+  game.start();
+  advance(game, 0.7, [{ hit: true }, {}]);
+  game.cancelServeCharge();
+  assert.equal(game.serveCharge, 0);
+  assert.equal(game.serveCharging, false);
+  advance(game, 0.4, [{ hit: true }, {}]);
+  assert.equal(game.serveCharge, 0);
+  game.update(1 / 120);
+  assert.equal(game.phase, 'serve');
+  serve(game, 0.1);
+  assert.equal(game.events.filter((event) => event.type === 'serve').length, 1);
+});
+
+test('canceling an already-released queued tap does not fire after the countdown', () => {
+  const game = new Game();
+  game.start();
+  advance(game, 0.05, [{ hit: true }, {}]);
+  game.update(1 / 120);
+  game.cancelServeCharge();
+  advance(game, 1);
+  assert.equal(game.phase, 'serve');
+  assert.equal(game.serveCharge, 0);
+  serve(game, 0.1);
+});
+
+test('a button held across a point cannot charge the next serve until released and pressed again', () => {
+  const game = new Game();
+  game.start();
+  serve(game);
+  landOn(game, 1);
+  assert.equal(game.server, 0);
+  advance(game, 2.5, [{ hit: true }, {}]);
+  assert.equal(game.phase, 'serve');
+  assert.equal(game.serveCharging, false);
+  assert.equal(game.serveCharge, 0);
+  game.update(1 / 120);
+  assert.equal(game.phase, 'serve');
+  serve(game, 0.2);
+});
+
+test('reset and restart clear both active and queued serve charges', () => {
+  const game = new Game();
+  game.start();
+  advance(game, 0.2, [{ hit: true }, {}]);
+  game.reset();
+  assert.equal(game.phase, 'ready');
+  assert.equal(game.serveCharging, false);
+  assert.equal(game.serveCharge, 0);
+  game.start();
+  advance(game, 0.05, [{ hit: true }, {}]);
+  game.update(1 / 120);
+  game.start();
+  advance(game, 1);
+  assert.equal(game.phase, 'serve');
+  assert.equal(game.rally, 0);
+  assert.equal(game.serveCharge, 0);
+  serve(game, 0.1);
 });
 
 test('long varied-input sessions remain finite, within the walls, and visibly on court', () => {

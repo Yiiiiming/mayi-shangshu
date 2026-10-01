@@ -1,4 +1,4 @@
-import { Game, WORLD } from './engine.mjs';
+import { Game, WORLD } from './engine.mjs?v=charge-serve-1';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('game');
@@ -60,6 +60,7 @@ function toggleSound() {
   if (soundEnabled) sound('hit');
 }
 function clearInputs() {
+  game.cancelServeCharge();
   keys.clear(); touchPointers.clear();
   for (const side of touch) for (const action of Object.keys(side)) delete side[action];
   document.querySelectorAll('.pressed').forEach((button) => button.classList.remove('pressed'));
@@ -103,6 +104,8 @@ window.addEventListener('keydown', (event) => {
   if (event.target instanceof HTMLElement && event.target.matches('input, textarea, select, [contenteditable="true"]')) return;
   if (event.code === 'Space' && event.target instanceof HTMLButtonElement) return;
   event.preventDefault();
+  // After pause/blur, operating-system repeats must not revive canceled keys.
+  if (event.repeat && !keys.has(event.code)) return;
   keys.add(event.code);
   if (event.repeat) return;
   if (event.code === 'Space' && (game.phase === 'ready' || game.phase === 'over' || paused)) start();
@@ -130,6 +133,7 @@ document.querySelectorAll('[data-action]').forEach((button) => {
   const release = (event) => {
     const pointer = touchPointers.get(event.pointerId);
     if (!pointer) return;
+    if (event.type !== 'pointerup' && pointer.side === game.server && (pointer.action === 'hit' || pointer.action === 'smash')) game.cancelServeCharge();
     touchPointers.delete(event.pointerId);
     const stillHeld = [...touchPointers.values()].some((p) => p.side === pointer.side && p.action === pointer.action);
     touch[pointer.side][pointer.action] = stillHeld;
@@ -148,7 +152,17 @@ function inputs() {
 }
 
 function syncUI() {
-  const stamp = [game.phase, game.score, game.server, game.rally, paused, transient, time < transientUntil].join('|');
+  const showPower = game.phase === 'serve' && !paused;
+  $('serve-power').hidden = !showPower;
+  if (showPower) {
+    const percent = Math.round(game.serveCharge * 100);
+    $('serve-power').style.setProperty('--power-color', colors[game.server]);
+    $('power-fill').style.transform = `scaleX(${game.serveCharge})`;
+    $('power-value').textContent = `${percent}%`;
+    $('power-meter').setAttribute('aria-valuenow', String(percent));
+    $('power-label').textContent = game.serveCharging ? (percent === 100 ? '已蓄满 · 松开发球' : '蓄力中 · 松开发球') : '按住蓄力 · 松开发球';
+  }
+  const stamp = [game.phase, game.score, game.server, game.rally, game.serveCharging, paused, transient, time < transientUntil].join('|');
   if (stamp === lastUI) return;
   lastUI = stamp;
   for (let side = 0; side < 2; side++) {
@@ -189,13 +203,13 @@ function syncUI() {
     if (game.phase === 'serve') {
       $('announcement').textContent = `${names[game.server]}发球`;
       const small = document.createElement('small');
-      small.textContent = game.server === 0 ? '按 S 或 F，把球送过网' : '按 ↓ 或 K，把球送过网';
+      small.textContent = game.server === 0 ? '按住 S（或 F）蓄力，松开发球' : '按住 ↓（或 K）蓄力，松开发球';
       $('announcement').append(small);
     } else if (game.phase === 'point') {
       $('announcement').textContent = `${names[game.server]} +1`;
       const small = document.createElement('small'); small.textContent = game.pointReason; $('announcement').append(small);
     } else if (time < transientUntil) $('announcement').textContent = transient;
-    $('court-status').textContent = game.phase === 'serve' ? '挥拍发球 · 准备接招' : game.phase === 'point' ? '下一球，由得分方发球' : '身前快攻 · 身后挑高 · 后墙反弹';
+    $('court-status').textContent = game.phase === 'serve' ? '短按发近球 · 长按发远球' : game.phase === 'point' ? '下一球，由得分方发球' : '身前快攻 · 身后挑高 · 后墙反弹';
   }
 }
 
@@ -298,7 +312,8 @@ function drawPlayer(player, side) {
   line([[x + lean, y - 71], [x - lean * .5, y - 49]], color, 11);
   const progress = 1 - player.swing;
   let angle = -0.67;
-  if (player.swing > 0) angle = -2.5 + Math.sin(progress * Math.PI * .68) * 3.55;
+  if (game.phase === 'serve' && game.server === side && game.serveCharging) angle = -1.15 - game.serveCharge * 1.1;
+  else if (player.swing > 0) angle = -2.5 + Math.sin(progress * Math.PI * .68) * 3.55;
   if (player.shot === 'smash' && player.swing > 0) angle -= .25;
   const hand = [shoulder[0] + dir * Math.cos(angle) * 43, shoulder[1] + Math.sin(angle) * 43];
   const elbow = [shoulder[0] + dir * 18, shoulder[1] + (player.swing ? -8 : 17)];
@@ -402,5 +417,5 @@ function frame(now) {
 }
 
 // Read-only snapshot for support and repeatable browser verification.
-window.badminton = Object.freeze({ snapshot: () => ({ phase: game.phase, score: [...game.score], paused, server: game.server, rally: game.rally, longestRally: game.longestRally, players: game.players.map(({ x, y }) => ({ x, y })), shuttle: { x: game.shuttle.x, y: game.shuttle.y, vx: game.shuttle.vx, vy: game.shuttle.vy, active: game.shuttle.active }, winner: game.winner }) });
+window.badminton = Object.freeze({ snapshot: () => ({ phase: game.phase, score: [...game.score], paused, server: game.server, serveCharge: game.serveCharge, serveCharging: game.serveCharging, rally: game.rally, longestRally: game.longestRally, players: game.players.map(({ x, y }) => ({ x, y })), shuttle: { x: game.shuttle.x, y: game.shuttle.y, vx: game.shuttle.vx, vy: game.shuttle.vy, active: game.shuttle.active }, winner: game.winner }) });
 syncUI(); requestAnimationFrame(frame);

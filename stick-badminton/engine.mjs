@@ -31,6 +31,11 @@ export class Game {
     this.longestRally = 0;
     this.pointTimer = 0;
     this.serveTimer = 0;
+    this.serveCharge = 0;
+    this.serveCharging = false;
+    this._serveQueued = false;
+    this._serveBlocked = false;
+    this._actionDown = [false, false];
     this.message = '两个人，一片球场。准备开打！';
     this.pointReason = '';
     this.events = [];
@@ -41,6 +46,14 @@ export class Game {
   start() {
     this.reset();
     this._prepareServe();
+  }
+
+  /** Call before pausing or clearing inputs on blur/touch cancellation. */
+  cancelServeCharge() {
+    this.serveCharge = 0;
+    this.serveCharging = false;
+    this._serveQueued = false;
+    this._serveBlocked = true;
   }
 
   /** dt is in seconds. The caller pauses simply by not calling update(). */
@@ -57,6 +70,10 @@ export class Game {
   }
 
   _step(dt, inputs) {
+    const actionDown = [0, 1].map((side) => Boolean(inputs[side]?.hit || inputs[side]?.smash));
+    const pressed = actionDown.map((down, side) => down && !this._actionDown[side]);
+    const released = actionDown.map((down, side) => !down && this._actionDown[side]);
+    this._actionDown = actionDown;
     for (let side = 0; side < 2; side += 1) this._movePlayer(side, inputs[side] || {}, dt);
 
     if (this.phase === 'point') {
@@ -71,7 +88,26 @@ export class Game {
         ? Math.min(player.x + 38, WORLD.netX - 8)
         : Math.max(player.x - 38, WORLD.netX + 8);
       this.shuttle.y = player.y - 68;
-      if (this.serveTimer <= 0 && player._attackBuffer > 0) this._strike(this.server, true);
+      if (this._serveBlocked) {
+        // A held rally button or a canceled gesture must first be released.
+        // This release only arms the next press; it never launches a serve.
+        if (!actionDown[this.server]) this._serveBlocked = false;
+      } else {
+        if (pressed[this.server]) {
+          this.serveCharge = 0;
+          this.serveCharging = true;
+          this._serveQueued = false;
+        }
+        if (this.serveCharging && actionDown[this.server]) {
+          this.serveCharge = Math.min(1, this.serveCharge + dt / 1.2);
+        } else if (this.serveCharging && released[this.server]) {
+          this.serveCharging = false;
+          this._serveQueued = true;
+        }
+        // Keep quick taps made during the short ready countdown. A full
+        // charge can be held indefinitely; release is always required.
+        if (this.serveTimer <= 0 && this._serveQueued) this._strike(this.server, true);
+      }
       return;
     }
     if (this.phase !== 'playing') return;
@@ -142,7 +178,7 @@ export class Game {
 
     if (input.jump && !player._jumpWasDown) player._jumpBuffer = 0.13;
     player._jumpWasDown = Boolean(input.jump);
-    if (input.hit || input.smash) {
+    if (this.phase === 'playing' && (input.hit || input.smash)) {
       player._requestedShot = input.smash ? 'smash' : 'hit';
       if (player._attackCooldown <= 0) {
         player._attackBuffer = 0.18;
@@ -204,10 +240,13 @@ export class Game {
       && shuttle.y < WORLD.netTop + 15 && height > 45;
     let horizontal;
     let vertical;
+    const charge = serving ? this.serveCharge : 0;
 
     if (serving) {
-      horizontal = 420 + forwardSpeed * 0.32;
-      vertical = -510 + player.vy * 0.1;
+      // At the default standing position this ranges from a short serve
+      // near x=651 to a deep serve near x=1034 (mirrored for the right side).
+      horizontal = 215 + charge * 195 + forwardSpeed * 0.08;
+      vertical = -510 - charge * 60 + player.vy * 0.07;
     } else if (attacking) {
       // A clean contact in front transfers more forward momentum and angles
       // the racket downward. A ball behind the shoulder gets a weaker lift.
@@ -234,11 +273,16 @@ export class Game {
     this.lastHitter = side;
     this._wallSinceHit = false;
     this.phase = 'playing';
+    this.serveCharge = 0;
+    this.serveCharging = false;
+    this._serveQueued = false;
     this.pointReason = '';
     this.rally += 1;
     this.longestRally = Math.max(this.longestRally, this.rally);
     this.message = attacking ? `${NAMES[side]}扣杀！` : '看准来球，挥拍！';
-    this._emit({ type: serving ? 'serve' : attacking ? 'smash' : 'hit', player: side });
+    this._emit(serving
+      ? { type: 'serve', player: side, charge }
+      : { type: attacking ? 'smash' : 'hit', player: side });
   }
 
   _awardPoint(winner, reason) {
@@ -271,6 +315,10 @@ export class Game {
     this._wallSinceHit = false;
     this.pointTimer = 0;
     this.serveTimer = 0.48;
+    this.serveCharge = 0;
+    this.serveCharging = false;
+    this._serveQueued = false;
+    this._serveBlocked = this._actionDown[this.server];
     this.pointReason = '';
     for (let side = 0; side < 2; side += 1) {
       const player = this.players[side];
@@ -287,7 +335,7 @@ export class Game {
     const player = this.players[this.server];
     Object.assign(this.shuttle, { x: player.x + player.facing * 38, y: player.y - 68, vx: 0, vy: 0, active: false });
     this.shuttle.trail.length = 0;
-    this.message = `${NAMES[this.server]}发球 · 按挥拍键开始`;
+    this.message = `${NAMES[this.server]}发球 · 按住蓄力，松开发球`;
   }
 
   _emit(event) {
