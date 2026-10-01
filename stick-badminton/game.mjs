@@ -1,5 +1,5 @@
-import { Game, WORLD } from './engine.mjs?v=bilingual-1';
-import { locales } from './locales.mjs?v=bilingual-1';
+import { Game, WORLD } from './engine.mjs?v=power-count-1';
+import { locales } from './locales.mjs?v=power-count-1';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('game');
@@ -26,6 +26,7 @@ let hitFlash = 0;
 const wallFlash = [0, 0];
 let transient = '';
 let transientUntil = 0;
+let deuceUntil = 0;
 let focusAfterOverlay = false;
 
 try { soundEnabled = localStorage.getItem('stick-badminton-sound') !== 'off'; } catch { /* Storage is optional. */ }
@@ -35,11 +36,11 @@ function sound(type) {
   try {
     audio ||= new (window.AudioContext || window.webkitAudioContext)();
     if (audio.state === 'suspended') audio.resume().catch(() => {});
-    const notes = type === 'win' ? [523, 659, 784, 1047] : type === 'point' ? [523, 698] : type === 'power' ? [160, 80] : type === 'wall' ? [240, 160] : type === 'net' ? [90] : [420, 680];
+    const notes = type === 'unlimited-power' ? [392, 523, 784, 1047] : type === 'win' ? [523, 659, 784, 1047] : type === 'point' ? [523, 698] : type === 'power' ? [160, 80] : type === 'wall' ? [240, 160] : type === 'net' ? [90] : [420, 680];
     notes.forEach((freq, index) => {
       const oscillator = audio.createOscillator();
       const gain = audio.createGain();
-      const start = audio.currentTime + index * (type === 'win' ? 0.12 : 0.045);
+      const start = audio.currentTime + index * (type === 'win' || type === 'unlimited-power' ? 0.12 : 0.045);
       oscillator.type = type === 'power' || type === 'net' ? 'triangle' : 'sine';
       oscillator.frequency.setValueAtTime(freq, start);
       oscillator.frequency.exponentialRampToValueAtTime(freq * 0.7, start + 0.12);
@@ -112,7 +113,7 @@ function start() {
   if (!languageSelected) return;
   clearInputs();
   if (paused) paused = false;
-  else { game.start(); particles = []; transient = ''; }
+  else { game.start(); particles = []; transient = ''; deuceUntil = 0; }
   sound('serve');
   focusAfterOverlay = true;
   syncUI();
@@ -126,7 +127,7 @@ function togglePause() {
   if (!paused) canvas.focus({ preventScroll: true });
   else $('start').focus({ preventScroll: true });
 }
-function restart() { if (!languageSelected) return; paused = false; game.reset(); clearInputs(); particles = []; transient = ''; syncUI(); $('start').focus({ preventScroll: true }); }
+function restart() { if (!languageSelected) return; paused = false; game.reset(); clearInputs(); particles = []; transient = ''; deuceUntil = 0; syncUI(); $('start').focus({ preventScroll: true }); }
 
 $('start').addEventListener('click', start);
 $('restart').addEventListener('click', restart);
@@ -203,8 +204,11 @@ function syncUI() {
   if (!languageSelected) {
     $('overlay').hidden = true;
     $('serve-power').hidden = true;
+    $('deuce-banner').hidden = true;
     return;
   }
+  $('deuce-banner').hidden = !game.unlimitedPower || time >= deuceUntil;
+  $('deuce-card').style.animationPlayState = paused ? 'paused' : 'running';
   const showPower = game.phase === 'serve' && !paused;
   $('serve-power').hidden = !showPower;
   if (showPower) {
@@ -215,11 +219,18 @@ function syncUI() {
     $('power-meter').setAttribute('aria-valuenow', String(percent));
     $('power-label').textContent = game.serveCharging ? (percent === 100 ? copy.powerFull : copy.powerCharging) : copy.powerIdle;
   }
-  const stamp = [language, game.phase, game.score, game.server, game.rally, game.serveCharging, paused, transient, time < transientUntil].join('|');
+  const stamp = [language, game.phase, game.score, game.server, game.rally, game.serveCharging, game.unlimitedPower, game.players.map((p) => `${p.powerCharges}:${p.powerProgress}`).join(','), paused, transient, time < transientUntil].join('|');
   if (stamp === lastUI) return;
   lastUI = stamp;
   for (let side = 0; side < 2; side++) {
     $(`score-${side}`).textContent = game.score[side];
+    const player = game.players[side];
+    $(`power-count-${side}`).textContent = game.unlimitedPower ? '∞' : player.powerCharges;
+    $(`power-progress-${side}`).textContent = game.unlimitedPower ? copy.powerUnlimited : `${player.powerProgress}/3 · +1`;
+    const stock = $(`power-stock-${side}`);
+    stock.setAttribute('aria-label', copy.powerStockAria(names[side], player.powerCharges, player.powerProgress, game.unlimitedPower));
+    stock.classList[game.unlimitedPower ? 'add' : 'remove']('unlimited');
+    stock.classList[!game.unlimitedPower && player.powerCharges === 0 ? 'add' : 'remove']('empty');
     $(`serve-${side}`).hidden = game.server !== side || game.phase === 'ready' || game.phase === 'over';
   }
   $('pause').hidden = game.phase === 'ready' || game.phase === 'over';
@@ -420,6 +431,12 @@ function events() {
   for (const event of game.events.splice(0)) {
     if (event.type === 'jump') continue;
     sound(event.type);
+    if (event.type === 'unlimited-power') {
+      deuceUntil = time + 4.2;
+      clearInputs();
+      emitParticles(350, 220, colors[0], 26); emitParticles(750, 220, colors[1], 26);
+      $('live-status').textContent = copy.deuceLive;
+    }
     if (event.type === 'wall') {
       wallFlash[event.side] = .25;
       emitParticles(game.shuttle.x, game.shuttle.y, '#f9dc55', 9);
@@ -470,5 +487,5 @@ function frame(now) {
 }
 
 // Read-only snapshot for support and repeatable browser verification.
-window.badminton = Object.freeze({ snapshot: () => ({ language, languageSelected, phase: game.phase, score: [...game.score], paused, server: game.server, serveCharge: game.serveCharge, serveCharging: game.serveCharging, lastHitter: game.lastHitter, rally: game.rally, longestRally: game.longestRally, players: game.players.map(({ x, y, shot }) => ({ x, y, shot })), shuttle: { x: game.shuttle.x, y: game.shuttle.y, vx: game.shuttle.vx, vy: game.shuttle.vy, active: game.shuttle.active }, winner: game.winner }) });
+window.badminton = Object.freeze({ snapshot: () => ({ language, languageSelected, phase: game.phase, score: [...game.score], unlimitedPower: game.unlimitedPower, paused, server: game.server, serveCharge: game.serveCharge, serveCharging: game.serveCharging, lastHitter: game.lastHitter, rally: game.rally, longestRally: game.longestRally, players: game.players.map(({ x, y, shot, powerCharges, powerProgress }) => ({ x, y, shot, powerCharges, powerProgress })), shuttle: { x: game.shuttle.x, y: game.shuttle.y, vx: game.shuttle.vx, vy: game.shuttle.vy, active: game.shuttle.active }, winner: game.winner }) });
 syncUI(); requestAnimationFrame(frame);

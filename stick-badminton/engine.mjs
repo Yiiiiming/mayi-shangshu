@@ -17,12 +17,14 @@ export class Game {
     this.players = [0, 1].map((side) => ({
       x: side ? 835 : 265, y: WORLD.floorY, vx: 0, vy: 0,
       facing: side ? -1 : 1, swing: 0, shot: 'hit',
+      powerCharges: 3, powerProgress: 0,
       color: side ? '#e56047' : '#2364dc',
       _jumpWasDown: false, _jumpBuffer: 0, _attackBuffer: 0,
       _attackCooldown: 0, _hitCooldown: 0, _requestedShot: 'hit',
     }));
     this.shuttle = { x: 303, y: 432, vx: 0, vy: 0, active: false, trail: [] };
     this.score = [0, 0];
+    this.unlimitedPower = false;
     this.phase = 'ready';
     this.server = 0;
     this.winner = null;
@@ -179,7 +181,7 @@ export class Game {
     if (input.jump && !player._jumpWasDown) player._jumpBuffer = 0.13;
     player._jumpWasDown = Boolean(input.jump);
     if (this.phase === 'playing' && (input.hit || input.power)) {
-      player._requestedShot = input.power ? 'power' : 'hit';
+      player._requestedShot = input.power && (this.unlimitedPower || player.powerCharges > 0) ? 'power' : 'hit';
       if (player._attackCooldown <= 0) {
         player._attackBuffer = 0.18;
         player.swing = 1;
@@ -236,7 +238,8 @@ export class Game {
     const forwardSpeed = player.vx * direction;
     const incomingSpeed = clamp(-shuttle.vx * direction, -900, 900);
     const incomingFall = clamp(shuttle.vy, -700, 700);
-    const attacking = !serving && player._requestedShot === 'power';
+    const attacking = !serving && player._requestedShot === 'power'
+      && (this.unlimitedPower || player.powerCharges > 0);
     let horizontal;
     let vertical;
     const charge = serving ? this.serveCharge : 0;
@@ -298,6 +301,16 @@ export class Game {
     this.pointReason = '';
     this.rally += 1;
     this.longestRally = Math.max(this.longestRally, this.rally);
+    if (!serving && !this.unlimitedPower) {
+      // Only racket contact spends a power shot or earns recharge progress.
+      // Spending first allows a third successful contact to refill immediately.
+      if (attacking) player.powerCharges -= 1;
+      player.powerProgress += 1;
+      if (player.powerProgress === 3) {
+        player.powerCharges += 1;
+        player.powerProgress = 0;
+      }
+    }
     this.message = attacking ? `${NAMES[side]}强力球！` : '看准来球，挥拍！';
     this._emit(serving
       ? { type: 'serve', player: side, charge }
@@ -313,6 +326,11 @@ export class Game {
     this.shuttle.vy = 0;
     this.pointReason = reason;
     this._emit({ type: 'point', player: winner });
+    const unlockPower = !this.unlimitedPower && this.score[0] === 10 && this.score[1] === 10;
+    if (unlockPower) {
+      this.unlimitedPower = true;
+      this._emit({ type: 'unlimited-power' });
+    }
     const winningScore = this.score[winner];
     if ((winningScore >= this.target && winningScore - this.score[1 - winner] >= 2)
       || winningScore >= Math.max(15, this.target)) {
@@ -323,7 +341,7 @@ export class Game {
       return;
     }
     this.phase = 'point';
-    this.pointTimer = 1.35;
+    this.pointTimer = unlockPower ? 4.5 : 1.35;
     this.message = `${NAMES[winner]} +1 · ${reason}`;
   }
 

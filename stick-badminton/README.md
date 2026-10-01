@@ -19,6 +19,8 @@ Space starts or resumes after language selection; P / Esc pauses; M toggles soun
 
 **Rallies:** get close and swing, or hold swing for repeated attempts. Contact position and height, your movement, and the incoming shuttle affect the return: front contacts tend to be faster and flatter; behind-body and low contacts produce higher recovery shots. E / slash fires a power shot from the ground or the air; a clean contact can reach the opposite back wall. Very late, low contact beside the net can still fail.
 
+**Power shot stock:** each player starts a match with 3 power shots. A successful power contact uses 1; swinging at empty air costs nothing. Every 3 successful rally hits by that player, including normal and power shots, earn 1 more, with no stock limit. Serves do not count. The scoreboard shows each player's remaining stock and progress toward the next charge. At zero stock, E / slash still returns the shuttle as a normal shot. Stock and progress carry across points. When the score first reaches **10–10**, an animated announcement unlocks **unlimited power shots for both players for the rest of the match**. Starting a new match restores 3 each.
+
 **Scoring and walls:** first to 11, win by 2, capped at 15. Every rally scores a point, and its winner serves next. A shuttle landing in your half gives your opponent the point. Both back walls rebound the shuttle; after a rebound, even the original hitter can rescue it once it returns to their own half.
 
 ## 中文
@@ -39,6 +41,8 @@ Space starts or resumes after language selection; P / Esc pauses; M toggles soun
 **蓄力发球：**按住自己的挥拍键蓄力，松开发球。轻点发到网前，中等蓄力发到后场，蓄满可以打到对面后墙。约 1.2 秒蓄满，满力后仍需松开发出。只有发球方能蓄力，大力击球键在发球阶段无效。若上一回合一直按住挥拍键，需要先松开再重新蓄力。暂停、切换窗口或触控中断会取消蓄力；回来后松开并重新按下即可。
 
 **回合击球：**靠近球挥拍，也可以按住连续挥拍。人与球的相对位置、击球高度、跑动和来球速度都会改变出球：身前击球偏平快，身后和低位击球偏高弧线救球。蓝方 E、红方 / 可在地面或空中打出大力球，正常触球能冲到对面后墙；贴网过低、出手过晚仍可能下网。
+
+**大力击球次数：**每人开局有 3 次，成功打出大力球消耗 1 次，挥空不扣次数。每人每成功回击 3 下球（普通和大力击球都算，发球不算），增加 1 次，次数没有上限。比分牌显示双方剩余次数和补充进度，次数与进度会保留到下一回合。用完后，按 E / 仍可普通击球。比分第一次到 **10–10** 时，会播放动画提示：**双方在本场剩余时间内都可无限大力击球**。重新开局后恢复为每人 3 次。
 
 **计分与墙壁：**11 分制，需净胜 2 分，15 分封顶；每球得分，得分方发下一球。球落在自己半场，对方得分。两侧后墙会反弹来球；撞墙后，即使是原击球者，也能在球回到自己半场时再次救球。
 

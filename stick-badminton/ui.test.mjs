@@ -91,7 +91,16 @@ async function setup({ language = 'zh', start = true, storedLanguage = null } = 
   Object.assign(win, { devicePixelRatio: 1, matchMedia: () => ({ matches: false }) });
   Object.assign(globalThis, { window: win, document: doc, HTMLElement: Element, HTMLButtonElement: Button,
     localStorage: { getItem: (key) => key.includes('sound') ? 'off' : storedLanguage, setItem() {} }, requestAnimationFrame: (callback) => { frameCallback = callback; } });
-  await import(`./game.mjs?charge-ui=${instance++}`);
+  // Capture this module's real engine only inside the test harness. Contact
+  // fixtures can exercise UI updates without adding production state mutators.
+  const gameSource = await readFile(new URL('./game.mjs', import.meta.url), 'utf8');
+  const enginePath = gameSource.match(/from ['"]([^'"]*engine\.mjs[^'"]*)['"]/)[1];
+  const { Game } = await import(new URL(enginePath, import.meta.url));
+  const originalReset = Game.prototype.reset;
+  let engine;
+  Game.prototype.reset = function (...args) { engine = this; return originalReset.apply(this, args); };
+  try { await import(`./game.mjs?charge-ui=${instance++}`); }
+  finally { Game.prototype.reset = originalReset; }
   const tick = (count = 1) => { for (let i = 0; i < count; i++) { now += 1000 / 60; frameCallback(now); } };
   const key = (type, code, extra = {}) => win.dispatch(type, { code, target: get('game'), ...extra });
   const pointer = (type, id = 1, side = 0, action = 'hit') => touchButtons.find((b) => +b.dataset.player === side && b.dataset.action === action).dispatch(type, { pointerId: id });
@@ -100,7 +109,7 @@ async function setup({ language = 'zh', start = true, storedLanguage = null } = 
   tick(36);
   const text = (element) => [element.textContent, element.innerHTML, ...element.attributes.values(),
     ...element.appended.map(text), ...[...element.children.values()].map(text)].join(' ');
-  return { get, key, pointer, tick, doc, win, elements, text, touchButtons, staticNodes, state: () => win.badminton.snapshot() };
+  return { get, key, pointer, tick, doc, win, elements, text, touchButtons, staticNodes, engine, state: () => win.badminton.snapshot() };
 }
 
 test('full serve charge waits for release and meter reaches 100%', async () => {
@@ -253,7 +262,9 @@ test('E and Slash select ground-level power swings for their own players', async
 });
 
 const dynamicIds = ['overlay-label', 'overlay-title', 'overlay-copy', 'start', 'start-hint', 'court-status',
-  'announcement', 'power-label', 'power-value', 'pause', 'sound', 'fullscreen', 'fullscreen-label', 'live-status'];
+  'announcement', 'power-label', 'power-value', 'pause', 'sound', 'fullscreen', 'fullscreen-label', 'live-status',
+  'power-stock-0', 'power-stock-1', 'power-count-0', 'power-count-1', 'power-progress-0', 'power-progress-1',
+  'deuce-title', 'deuce-copy'];
 function assertEnglish(h, ids = dynamicIds) {
   for (const id of ids) assert.doesNotMatch(h.text(h.get(id)), /\p{Script=Han}/u, `Chinese leaked into #${id}`);
 }
@@ -386,4 +397,140 @@ test('Chinese-English-Chinese language switches cancel charge and replace old la
   h.get('start').dispatch('click'); h.tick(3);
   assert.equal(h.state().phase, 'serve');
   assert.equal(h.state().serveCharge, 0);
+});
+
+function makeContact(h, side, power = false) {
+  const game = h.engine;
+  const player = game.players[side];
+  game.phase = 'playing';
+  game.lastHitter = 1 - side;
+  player._attackCooldown = 0;
+  player._hitCooldown = 0;
+  player._attackBuffer = 0;
+  Object.assign(game.shuttle, { x: player.x + player.facing * 40, y: player.y - 80, vx: 0, vy: 0, active: true });
+  const key = side === 0 ? (power ? 'KeyE' : 'KeyS') : (power ? 'Slash' : 'ArrowDown');
+  h.key('keydown', key); h.tick(); h.key('keyup', key); h.tick();
+}
+
+// Play an actual serve and let the shuttle land. A short serve from the rear
+// court falls in the server's own half, so alternating winners needs no direct
+// edits to scores, awardPoint calls, or synthetic engine events.
+function scorePoint(h, winner) {
+  for (let i = 0; i < 400 && h.state().phase === 'point'; i++) h.tick();
+  assert.equal(h.state().phase, 'serve');
+  h.tick(36);
+  const side = h.state().server;
+  if (side !== winner) {
+    const backKey = side === 0 ? 'KeyA' : 'ArrowRight';
+    h.key('keydown', backKey); h.tick(60); h.key('keyup', backKey); h.tick(8);
+  }
+  const before = h.state().score;
+  const key = side === 0 ? 'KeyS' : 'ArrowDown';
+  h.key('keydown', key); h.tick(6); h.key('keyup', key); h.tick();
+  assert.equal(h.state().phase, 'playing');
+  for (let i = 0; i < 240 && h.state().phase === 'playing'; i++) h.tick();
+  assert.ok(['point', 'over'].includes(h.state().phase));
+  assert.equal(h.state().score[winner], before[winner] + 1);
+  assert.equal(h.state().score[1 - winner], before[1 - winner]);
+}
+
+test('power stocks start at three and localize their counts and progress in both languages', async () => {
+  const h = await setup({ language: 'en', start: false });
+  for (const side of [0, 1]) {
+    assert.equal(h.state().players[side].powerCharges, 3);
+    assert.equal(h.state().players[side].powerProgress, 0);
+    assert.equal(h.get(`power-count-${side}`).textContent, '3');
+    assert.match(h.get(`power-progress-${side}`).textContent, /0\s*\/\s*3/);
+    const label = h.get(`power-stock-${side}`).attributes.get('aria-label');
+    assert.match(label, side === 0 ? /Blue/ : /Red/);
+    assert.match(label, /3/);
+    assert.doesNotMatch(label, /\p{Script=Han}/u);
+  }
+  assert.equal(h.state().unlimitedPower, false);
+  assert.equal(h.get('deuce-banner').hidden, true);
+  h.get('lang-switch').dispatch('click'); h.get('choose-zh').dispatch('click'); h.tick();
+  for (const side of [0, 1]) {
+    assert.match(h.get(`power-stock-${side}`).attributes.get('aria-label'), side === 0 ? /蓝方/ : /红方/);
+    assert.equal(h.get(`power-count-${side}`).textContent, '3');
+  }
+  h.get('lang-switch').dispatch('click'); h.get('choose-en').dispatch('click'); h.tick();
+  assertEnglish(h);
+});
+
+test('power count and individual progress follow contacts, recovery, empty stock, and restart', async () => {
+  const h = await setup({ language: 'en' });
+  const expectStock = (side, count, progress) => {
+    assert.equal(h.state().players[side].powerCharges, count);
+    assert.equal(h.state().players[side].powerProgress, progress);
+    assert.equal(h.get(`power-count-${side}`).textContent, String(count));
+    assert.match(h.get(`power-progress-${side}`).textContent, new RegExp(`${progress}\\s*\\/\\s*3`));
+  };
+  makeContact(h, 0, true); expectStock(0, 2, 1);
+  makeContact(h, 0, false); expectStock(0, 2, 2);
+  makeContact(h, 0, true); expectStock(0, 2, 0);
+  expectStock(1, 3, 0);
+  for (let i = 0; i < 6; i++) makeContact(h, 0);
+  expectStock(0, 4, 0); // Stock is not capped at its starting value.
+  for (let i = 0; i < 4; i++) makeContact(h, 1, true);
+  expectStock(1, 0, 1);
+  makeContact(h, 1, true);
+  assert.equal(h.state().players[1].shot, 'hit');
+  expectStock(1, 0, 2);
+  makeContact(h, 1, true); expectStock(1, 1, 0);
+  assertEnglish(h);
+  h.get('restart').dispatch('click'); h.tick();
+  expectStock(0, 3, 0); expectStock(1, 3, 0);
+  assert.equal(h.state().unlimitedPower, false);
+  assert.equal(h.get('deuce-banner').hidden, true);
+});
+
+test('a real 10–10 match unlocks infinite counters and a localized announcement that pauses safely', async () => {
+  const h = await setup({ language: 'en' });
+  for (let round = 0; round < 10; round++) {
+    scorePoint(h, 0);
+    assert.equal(h.state().unlimitedPower, false);
+    assert.equal(h.get('deuce-banner').hidden, true);
+    scorePoint(h, 1);
+    if (round < 9) {
+      assert.equal(h.state().unlimitedPower, false);
+      assert.equal(h.get('deuce-banner').hidden, true);
+    }
+  }
+  assert.deepEqual(h.state().score, [10, 10]);
+  assert.equal(h.state().unlimitedPower, true);
+  assert.equal(h.get('deuce-banner').hidden, false);
+  for (const side of [0, 1]) {
+    assert.equal(h.get(`power-count-${side}`).textContent, '∞');
+    assert.match(h.get(`power-progress-${side}`).textContent, /unlimited/i);
+    assert.match(h.get(`power-stock-${side}`).attributes.get('aria-label'), /unlimited/i);
+    assert.equal(h.state().players[side].powerCharges, 3, 'Serves must not spend or earn charges');
+    assert.equal(h.state().players[side].powerProgress, 0);
+  }
+  assertEnglish(h);
+  assert.match(h.text(h.get('deuce-title')) + h.text(h.get('deuce-copy')), /unlimited/i);
+  h.key('keydown', 'KeyP'); h.key('keyup', 'KeyP'); h.tick(360);
+  assert.equal(h.state().paused, true);
+  assert.equal(h.state().phase, 'point');
+  h.get('lang-switch').dispatch('click'); h.tick(360);
+  h.get('choose-zh').dispatch('click'); h.tick();
+  assert.equal(h.get('deuce-banner').hidden, false);
+  assert.match(h.text(h.get('deuce-title')) + h.text(h.get('deuce-copy')), /无限/);
+  assert.match(h.get('power-stock-0').attributes.get('aria-label'), /无限/);
+  h.get('start').dispatch('click'); h.tick(200);
+  assert.equal(h.get('deuce-banner').hidden, false);
+  h.tick(75);
+  assert.equal(h.get('deuce-banner').hidden, true);
+  assert.equal(h.state().phase, 'serve');
+  scorePoint(h, 0);
+  assert.deepEqual(h.state().score, [11, 10]);
+  assert.equal(h.get('deuce-banner').hidden, true, 'Unlock animation must not repeat for later points');
+  assert.equal(h.get('power-count-0').textContent, '∞');
+  scorePoint(h, 0);
+  assert.equal(h.state().phase, 'over');
+  assert.equal(h.state().unlimitedPower, true);
+  h.get('start').dispatch('click'); h.tick();
+  assert.equal(h.state().unlimitedPower, false);
+  assert.equal(h.get('power-count-0').textContent, '3');
+  assert.equal(h.get('power-count-1').textContent, '3');
+  assert.equal(h.get('deuce-banner').hidden, true);
 });

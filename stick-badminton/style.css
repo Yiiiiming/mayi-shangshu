@@ -31,3 +31,19 @@ footer p{line-height:1.8}.title-row{gap:18px;flex-wrap:wrap}
 @media(max-width:1000px){html[lang="en"] .key-row{gap:7px}.controls{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.key-row{flex-wrap:wrap}}
 @media(max-width:760px){.title-row{gap:13px}.tools{flex-wrap:wrap}html[lang="en"] .serve-power{width:182px}html[lang="en"] .touch-side button{font-size:8px}html[lang="en"] .court-bottom>span:first-child{display:none}html[lang="en"] .court-bottom{justify-content:flex-end}html[lang="en"] .announcement small{font-size:7.5px}html[lang="en"] .mode-label{letter-spacing:0}footer{flex-wrap:wrap}footer>div{margin-left:auto}}
 @media(max-width:400px){.language-card{padding:29px 24px}.language-card h1{font-size:29px}.language-card h1>span:last-child{font-size:21px}.language-options{gap:9px}.language-options button{padding:15px 12px}.language-options strong{font-size:21px}html[lang="en"] .brand small{font-size:6.5px;letter-spacing:.5px}html[lang="en"] .mode-label{font-size:7px;gap:3px}}
+
+/* Each player's power stock sits directly below their name. */
+.score-player{flex-direction:column;gap:3px}.score-identity{display:flex;align-items:center;justify-content:center;gap:7px}
+.power-stock{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:0 5px;font-size:8px;line-height:1.2;min-width:63px}
+.power-stock>b{font-size:17px;font-variant-numeric:tabular-nums;line-height:1.1}.power-stock>small{flex-basis:100%;font-size:8px;line-height:1.4;color:#6b7c73;font-weight:500}
+.power-stock.empty{color:#83908b}.power-stock.unlimited{background:#f9dc5580;border-radius:5px;padding:1px 4px}.power-stock.unlimited>b{font-size:19px}
+.power-rules{margin:10px 2px 0;font-size:10px;line-height:1.8;color:#697b71}
+.deuce-banner{position:absolute;inset:0;display:grid;place-items:center;background:#182b366b;z-index:2;pointer-events:none}
+.deuce-card{width:min(80%,480px);text-align:center;border:2px solid var(--yellow);background:var(--ink);color:#fff;border-radius:9px;padding:20px 26px;box-shadow:7px 7px 0 #f9dc55;animation:power-unlock 4.2s both}
+.deuce-score{display:block;font-size:13px;font-weight:800;letter-spacing:6px;color:#bcd0d2}.deuce-infinity{display:block;font-size:90px;font-weight:800;line-height:1;color:var(--yellow)}
+.deuce-card h2{font-size:27px;margin:7px 0 11px;line-height:1.2;color:var(--yellow)}.deuce-card p{font-size:13px;line-height:1.6;margin:0 0 13px;color:#cfdddb}.deuce-keys{font-size:10px;letter-spacing:2px;font-weight:750}
+.overlay{z-index:3}.pause-button{z-index:4}
+@keyframes power-unlock{0%{opacity:0;transform:translateY(35px) scale(.8) rotate(-4deg)}12%{opacity:1;transform:translateY(0) scale(1.03) rotate(1deg)}20%,90%{opacity:1;transform:scale(1) rotate(0)}100%{opacity:0;transform:translateY(-12px) scale(1.02)}}
+@media(max-width:760px){.score-identity{gap:4px}.score-player{gap:2px}.power-stock{font-size:6px;gap:0 3px;min-width:51px}.power-stock>b{font-size:13px}.power-stock>small{font-size:6px}.power-stock.unlimited>b{font-size:14px}.deuce-card{width:min(82%,320px);padding:11px 18px;box-shadow:4px 4px 0 #f9dc55}.deuce-score{font-size:9px;letter-spacing:4px}.deuce-infinity{font-size:47px}.deuce-card h2{font-size:19px;margin:4px 0 7px}.deuce-card p{font-size:10px;margin-bottom:7px}.deuce-keys{font-size:8px}.power-rules{font-size:9px}}
+@media(prefers-reduced-motion:reduce){.deuce-card{animation:none}}
+@media(max-width:760px){.announcement{top:30%;font-size:13px}.announcement small{font-size:7.5px;margin-top:3px}}

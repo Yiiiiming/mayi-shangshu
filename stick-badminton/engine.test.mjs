@@ -499,3 +499,186 @@ test('long varied-input sessions remain finite, within the walls, and visibly on
   }
   assert.ok(totalPoints > 20);
 });
+
+function rallyContact(game, side, shot = 'hit') {
+  game.phase = 'playing';
+  game.lastHitter = 1 - side;
+  const player = game.players[side];
+  Object.assign(player, { x: side ? 780 : 320, y: 500, vx: 0, vy: 0, _attackCooldown: 0, _hitCooldown: 0 });
+  Object.assign(game.shuttle, {
+    x: player.x + player.facing * 25, y: 400,
+    vx: -400 * player.facing, vy: 150, active: true,
+  });
+  const inputs = [{}, {}];
+  inputs[side][shot] = true;
+  const oldRally = game.rally;
+  game.update(1 / 240, inputs);
+  assert.equal(game.lastHitter, side, 'fixture must make actual racket contact');
+  assert.equal(game.rally, oldRally + 1, 'fixture must make exactly one contact');
+}
+
+test('each player starts with three power shots and serves do not spend or earn them', () => {
+  const game = new Game();
+  assert.deepEqual(game.players.map(({ powerCharges, powerProgress }) => [powerCharges, powerProgress]), [[3, 0], [3, 0]]);
+  assert.equal(game.unlimitedPower, false);
+  for (const side of [0, 1]) {
+    game.start();
+    game.server = side;
+    serve(game);
+    assert.deepEqual(game.players.map(({ powerCharges, powerProgress }) => [powerCharges, powerProgress]), [[3, 0], [3, 0]]);
+  }
+});
+
+test('power swings that miss do not spend a charge or earn contact progress', () => {
+  const game = new Game();
+  game.start();
+  game.phase = 'playing';
+  Object.assign(game.shuttle, { x: WORLD.netX, y: 160, vx: 0, vy: 0, active: true });
+  advance(game, 0.5, [{ power: true }, { power: true }]);
+  assert.equal(game.phase, 'playing');
+  assert.deepEqual(game.players.map(({ powerCharges, powerProgress }) => [powerCharges, powerProgress]), [[3, 0], [3, 0]]);
+  assert.equal(game.events.filter(({ type }) => type === 'power').length, 0);
+});
+
+test('normal and power contacts replenish independently every three hits with no stock cap', () => {
+  const game = new Game();
+  game.start();
+  rallyContact(game, 0);
+  rallyContact(game, 1, 'power');
+  rallyContact(game, 0);
+  assert.deepEqual(game.players.map(({ powerCharges, powerProgress }) => [powerCharges, powerProgress]), [[3, 2], [2, 1]]);
+  rallyContact(game, 0);
+  assert.deepEqual(game.players.map(({ powerCharges, powerProgress }) => [powerCharges, powerProgress]), [[4, 0], [2, 1]]);
+  rallyContact(game, 1);
+  rallyContact(game, 1);
+  assert.deepEqual(game.players.map(({ powerCharges, powerProgress }) => [powerCharges, powerProgress]), [[4, 0], [3, 0]]);
+  for (let hit = 0; hit < 6; hit += 1) rallyContact(game, 0);
+  assert.equal(game.players[0].powerCharges, 6);
+});
+
+test('a successful power shot spends one charge and a third contact immediately recharges one', () => {
+  for (const side of [0, 1]) {
+    const game = new Game();
+    game.start();
+    rallyContact(game, side, 'power');
+    assert.equal(game.players[side].powerCharges, 2);
+    assert.equal(game.players[side].powerProgress, 1);
+    rallyContact(game, side, 'power');
+    assert.equal(game.players[side].powerCharges, 1);
+    rallyContact(game, side, 'power');
+    assert.equal(game.players[side].powerCharges, 1);
+    assert.equal(game.players[side].powerProgress, 0);
+    assert.equal(game.events.filter(({ type, player }) => type === 'power' && player === side).length, 3);
+    assert.equal(game.players[1 - side].powerCharges, 3);
+  }
+});
+
+test('at zero charges the power button returns a normal shot and still earns recharge progress', () => {
+  for (const side of [0, 1]) {
+    const game = new Game();
+    game.start();
+    game.players[side].powerCharges = 0;
+    for (let hit = 0; hit < 3; hit += 1) {
+      rallyContact(game, side, 'power');
+      assert.equal(game.players[side].shot, 'hit');
+      assert.equal(game.players[side]._requestedShot, 'hit');
+    }
+    assert.equal(game.players[side].powerCharges, 1);
+    assert.equal(game.players[side].powerProgress, 0);
+    assert.equal(game.events.filter(({ type }) => type === 'power').length, 0);
+    rallyContact(game, side, 'power');
+    assert.equal(game.players[side].shot, 'power');
+    assert.equal(game.players[side].powerCharges, 0);
+  }
+});
+
+test('a buffered or direct power contact cannot bypass an empty stock', () => {
+  const game = new Game();
+  game.start();
+  Object.assign(game.players[0], { powerCharges: 0, _requestedShot: 'power' });
+  game._strike(0, false);
+  assert.equal(game.players[0].shot, 'hit');
+  assert.equal(game.players[0].powerCharges, 0);
+  assert.equal(game.players[0].powerProgress, 1);
+  assert.equal(game.events.at(-1).type, 'hit');
+});
+
+test('stock and partial recharge progress survive a point and the next serve', () => {
+  const game = new Game();
+  game.start();
+  rallyContact(game, 0, 'power');
+  rallyContact(game, 1);
+  rallyContact(game, 0);
+  const stock = game.players.map(({ powerCharges, powerProgress }) => [powerCharges, powerProgress]);
+  landOn(game, 1);
+  advance(game, 1.6);
+  assert.equal(game.phase, 'serve');
+  assert.deepEqual(game.players.map(({ powerCharges, powerProgress }) => [powerCharges, powerProgress]), stock);
+  serve(game);
+  assert.deepEqual(game.players.map(({ powerCharges, powerProgress }) => [powerCharges, powerProgress]), stock);
+  rallyContact(game, 0);
+  assert.equal(game.players[0].powerCharges, 3);
+  assert.equal(game.players[0].powerProgress, 0);
+});
+
+test('10–10 unlocks unlimited power once and holds the point screen for the announcement', () => {
+  const game = new Game();
+  game.start();
+  game.score = [9, 9];
+  landOn(game, 1);
+  assert.deepEqual(game.score, [10, 9]);
+  assert.equal(game.unlimitedPower, false);
+  assert.ok(game.pointTimer <= 1.35);
+  landOn(game, 0);
+  assert.deepEqual(game.score, [10, 10]);
+  assert.equal(game.unlimitedPower, true);
+  assert.ok(game.pointTimer > 4.4 && game.pointTimer <= 4.5);
+  assert.deepEqual(game.events.filter(({ type }) => type === 'unlimited-power'), [{ type: 'unlimited-power' }]);
+  advance(game, 4);
+  assert.equal(game.phase, 'point');
+  advance(game, 0.6);
+  assert.equal(game.phase, 'serve');
+  landOn(game, 1);
+  assert.deepEqual(game.score, [11, 10]);
+  assert.equal(game.unlimitedPower, true);
+  assert.ok(game.pointTimer <= 1.35);
+  landOn(game, 0);
+  assert.deepEqual(game.score, [11, 11]);
+  assert.equal(game.unlimitedPower, true);
+  assert.equal(game.events.filter(({ type }) => type === 'unlimited-power').length, 1);
+});
+
+test('unlimited mode allows repeated power contacts from empty stock for both players', () => {
+  const game = new Game();
+  game.start();
+  game.score = [10, 9];
+  landOn(game, 0);
+  for (const player of game.players) Object.assign(player, { powerCharges: 0, powerProgress: 2 });
+  for (let hit = 0; hit < 20; hit += 1) {
+    const side = hit % 2;
+    rallyContact(game, side, 'power');
+    assert.equal(game.players[side].shot, 'power');
+    assert.equal(game.players[side].powerCharges, 0);
+    assert.equal(game.players[side].powerProgress, 2);
+  }
+  assert.equal(game.events.filter(({ type }) => type === 'power').length, 20);
+  landOn(game, 1);
+  landOn(game, 1);
+  assert.equal(game.phase, 'over');
+  assert.equal(game.unlimitedPower, true);
+});
+
+test('reset and a new match restore three charges and leave unlimited mode', () => {
+  for (const reset of ['reset', 'start']) {
+    const game = new Game();
+    game.start();
+    game.score = [10, 9];
+    landOn(game, 0);
+    Object.assign(game.players[0], { powerCharges: 1, powerProgress: 2 });
+    Object.assign(game.players[1], { powerCharges: 5, powerProgress: 1 });
+    game[reset]();
+    assert.equal(game.unlimitedPower, false);
+    assert.deepEqual(game.players.map(({ powerCharges, powerProgress }) => [powerCharges, powerProgress]), [[3, 0], [3, 0]]);
+    assert.equal(game.events.filter(({ type }) => type === 'unlimited-power').length, 0);
+  }
+});
