@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#182b36">
+  <meta name="description" content="火柴人羽毛球，双人同屏街机小游戏。一台电脑，一块键盘，来一场 11 分对决。">
+  <title>火柴人羽毛球 · 双人对决</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="火柴人羽毛球首页"><span class="brand-mark">羽</span><span>STICK CLUB<small>街机运动俱乐部 / 01</small></span></a>
+      <span class="mode-label"><span class="two-icon">Ⅱ</span> 双人同屏 <span class="separator">/</span> LOCAL 2P</span>
+    </header>
+    <section class="title-row" aria-label="游戏标题">
+      <div><div class="eyebrow">ONE KEYBOARD. TWO RIVALS.</div><h1>火柴人<span>羽毛球</span><span class="title-dot">.</span></h1></div>
+      <div class="tools">
+        <button id="sound" class="tool" aria-pressed="true" title="音效开关（M）">音效 <span>开</span></button>
+        <button id="fullscreen" class="tool" title="全屏游戏">全屏 <span>⛶</span></button>
+      </div>
+    </section>
+    <section id="arena" class="arena" aria-label="双人羽毛球游戏">
+      <canvas id="game" width="1100" height="600" tabindex="0" aria-label="羽毛球球场。左方 A D 移动、W 跳跃、S 挥拍、G 扣杀；右方方向键移动跳跃和挥拍、L 扣杀。">你的浏览器不支持 Canvas，请使用新版 Chrome、Edge 或 Safari。</canvas>
+      <div class="scoreboard" aria-label="比分">
+        <div class="score-player blue"><span class="player-tag">P1</span><span>蓝方</span><i id="serve-0" title="发球方"></i></div>
+        <div class="score"><strong id="score-0">0</strong><span>:</span><strong id="score-1">0</strong></div>
+        <div class="score-player red"><i id="serve-1" title="发球方" hidden></i><span>红方</span><span class="player-tag">P2</span></div>
+        <div class="score-rule">11 分制 · 净胜 2 分 · 15 分封顶</div>
+      </div>
+      <div class="court-label">COURT 01 <span>•</span> FRIENDLY MATCH</div>
+      <button id="pause" class="pause-button" aria-label="暂停游戏" title="暂停 / 继续（P 或 Esc）" hidden>Ⅱ</button>
+      <div id="rally" class="rally" hidden>连续回合 <b>0</b></div>
+      <div id="announcement" class="announcement" aria-live="polite"></div>
+      <div id="overlay" class="overlay">
+        <div class="start-card">
+          <span id="overlay-label" class="card-label">一起上场 / TWO PLAYER</span>
+          <h2 id="overlay-title">这一球，<br>谁也别让。</h2>
+          <p id="overlay-copy">叫上你的搭档，共用一块键盘。<br>先拿 11 分，赢下这一局。</p>
+          <button id="start" class="primary">开始对决 <span>↗</span></button>
+          <span id="start-hint" class="start-hint">也可以按空格开始</span>
+        </div>
+      </div>
+      <div class="court-bottom"><span>GOOD GAME. GREAT RALLY.</span><span id="court-status">等待两位选手入场</span></div>
+    </section>
+    <section class="controls" aria-label="操作说明">
+      <div class="control-player p1"><span class="control-avatar">1</span><div><h3>蓝方选手 <small>PLAYER ONE</small></h3><div class="key-row"><span><kbd>A</kbd><kbd>D</kbd> 移动</span><span><kbd>W</kbd> 跳跃</span><span><kbd>S</kbd> 挥拍</span><span><kbd>G</kbd> 扣杀</span></div></div></div>
+      <div class="control-player p2"><span class="control-avatar">2</span><div><h3>红方选手 <small>PLAYER TWO</small></h3><div class="key-row"><span><kbd>←</kbd><kbd>→</kbd> 移动</span><span><kbd>↑</kbd> 跳跃</span><span><kbd>↓</kbd> 挥拍</span><span><kbd>L</kbd> 扣杀</span></div></div></div>
+    </section>
+    <div class="touch-controls" aria-label="触屏双人操作">
+      <div class="touch-side p1"><button data-player="0" data-action="left" aria-label="蓝方向左">←</button><button data-player="0" data-action="right" aria-label="蓝方向右">→</button><button data-player="0" data-action="jump" aria-label="蓝方跳跃">跳</button><button data-player="0" data-action="hit" aria-label="蓝方挥拍">挥</button><button data-player="0" data-action="smash" aria-label="蓝方扣杀">扣</button></div>
+      <div class="touch-side p2"><button data-player="1" data-action="left" aria-label="红方向左">←</button><button data-player="1" data-action="right" aria-label="红方向右">→</button><button data-player="1" data-action="jump" aria-label="红方跳跃">跳</button><button data-player="1" data-action="hit" aria-label="红方挥拍">挥</button><button data-player="1" data-action="smash" aria-label="红方扣杀">扣</button></div>
+    </div>
+    <footer><p><span class="tip-label">小提示</span> 身前快攻，身后挑高；后墙能反弹，别急着放弃。<span class="alias">F / K 也能挥拍。</span></p><div><span><kbd>P</kbd> 暂停</span><button id="restart">重新开局 ↻</button></div></footer>
+    <p id="live-status" class="sr-only" aria-live="polite"></p>
+    <noscript>请开启 JavaScript 来玩火柴人羽毛球。</noscript>
+  </main>
+  <script type="module" src="game.mjs"></script>
+</body>
+</html>
