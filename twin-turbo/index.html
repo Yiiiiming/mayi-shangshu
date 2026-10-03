@@ -39,6 +39,8 @@
 .fullscreen-exit{display:none}.race-stage:fullscreen{display:grid;grid-template-rows:auto minmax(0,1fr);width:100vw;height:100vh;background:#101921;padding:12px;gap:10px}.race-stage:fullscreen .scoreboard{margin:0}.race-stage:fullscreen .arena{height:100%;min-height:0}.race-stage:fullscreen #game,.race-stage:fullscreen #hud{width:100%;height:100%;aspect-ratio:auto;min-height:0}.race-stage:fullscreen .fullscreen-exit{display:block}
 .speed-readout{background:#122431bb;padding:8px 12px;border-radius:7px;bottom:20px}.speed-readout b{bottom:53px;text-shadow:0 2px 4px #000}.speed-readout strong{font-size:30px}.speed-readout span{color:#b8c7ce}
 @media(max-width:780px){.header-actions{gap:12px}.icon-button{font-size:10px}.arena-tag b,.arena-meta b{font-size:8px;margin-left:2px}.speed-readout{padding:5px 8px;bottom:14px}.speed-readout strong{font-size:20px}.center-overlay{width:340px}.route-stages span{height:43px}.graphics-note{font-size:11px}}
+.mode-select{display:flex;gap:5px;margin-top:12px;padding:4px;background:#0f1b2680;border:1px solid #66818d44;border-radius:7px}.mode-select button{flex:1;padding:9px 3px;border:0;border-radius:4px;background:transparent;color:#94aabb;font-size:12px}.mode-select button.selected{background:#c6f56b;color:#203015;font-weight:650}.mode-description{color:#9eb0bc;font-size:10px;line-height:1.5;margin:8px 0 13px}.ai-control-note{font-size:10px;color:#d0a787;margin:9px 0 0;line-height:1.7}.record-result-status{font-size:10px;line-height:1.65;color:#a9c4c7;margin:0 0 10px}.record-result-status:empty{display:none}#qualify-retry{padding:0 0 12px;color:var(--lime)}#record-dialog{background:#17232d;border-color:#486574;max-height:90vh;overflow:auto}#record-dialog h2{margin-bottom:12px}#record-form{display:flex;flex-direction:column}#record-form label{font-size:12px;color:#b9c9d0;margin:10px 0}#record-name{width:100%;padding:13px 14px;border:1px solid #536d78;background:#101b24;color:#f3f7f2;font:inherit;font-size:16px;border-radius:7px}#record-name:focus-visible{outline:2px solid var(--lime);outline-offset:3px}#record-name-count{font-size:10px;text-align:right;color:#8299a8;margin-top:8px}#record-form .text-button{padding:14px 0 0}#record-message{min-height:44px}.leaderboard{margin:20px 0 42px;padding:29px 32px 18px;border:1px solid #344552;border-radius:14px;background:linear-gradient(120deg,#18252a,#141c22)}.leaderboard-heading{display:flex;align-items:center;justify-content:space-between;gap:20px}.leaderboard-heading h2{font-size:24px;letter-spacing:.1px}.leaderboard-heading h2 span{font:10px "SF Mono",monospace;color:var(--lime);margin-left:16px;letter-spacing:2px}.leaderboard-tabs{display:flex;gap:4px;border:1px solid #455b64;border-radius:7px;padding:4px}.leaderboard-tabs button{font-size:12px;border:0;background:transparent;border-radius:4px;color:#99adba;padding:8px 18px}.leaderboard-tabs button.selected{background:#34515a;color:#eff9f2}.leaderboard-intro{color:#8198a6;font-size:11px;line-height:1.7;margin:16px 0 18px}.leaderboard ol{list-style:none;margin:0;padding:0}.leaderboard-row{display:grid;grid-template-columns:50px 1fr auto;gap:16px;align-items:center;min-height:67px;border-top:1px solid #35485180;padding:12px 8px}.record-rank{font:20px "SF Mono",monospace;color:#839daa}.leaderboard-row:first-child .record-rank{color:var(--lime)}.record-identity strong{display:block;font-size:14px;font-weight:500;overflow-wrap:anywhere}.record-identity small{display:block;color:#718a9a;font-size:9px;margin-top:6px}.record-time{font:20px "SF Mono",monospace;color:#d6ebe4;font-variant-numeric:tabular-nums}.leaderboard-state{display:flex;gap:16px;align-items:center;min-height:46px}.leaderboard-state p{font-size:11px;color:#8da4af;line-height:1.7}.leaderboard-state .text-button{padding:0;color:var(--lime);white-space:nowrap}@media(max-width:780px){.leaderboard{padding:23px 18px 13px;margin-top:12px}.leaderboard-heading{gap:10px}.leaderboard-heading h2{font-size:20px}.leaderboard-heading h2 span{display:none}.leaderboard-tabs button{padding:8px 11px}.leaderboard-row{grid-template-columns:30px 1fr auto;gap:10px}.record-time{font-size:16px}.record-identity strong{font-size:13px}#menu .route-stages{display:none}.center-overlay{max-height:95%;overflow-y:auto}.ai-control-note{max-width:170px;font-size:9px}}
+.mode em{font-style:normal}
 
 </style>
 </head>
@@ -46,7 +48,7 @@
   <div class="shell">
     <header class="masthead">
       <a class="brand" href="#" aria-label="Twin Turbo 首页"><span class="brand-mark" aria-hidden="true"><i></i><i></i></span>TWIN<span class="brand-light">TURBO</span><span class="brand-dot">®</span></a>
-      <span class="mode"><span></span> LOCAL MULTIPLAYER <b>双人分屏</b></span>
+      <span class="mode"><span></span> <em id="mode-english">LOCAL MULTIPLAYER</em> <b id="mode-label">双人分屏</b></span>
       <div class="header-actions"><button class="icon-button" id="sound" aria-pressed="false" title="开启声音"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5Zm5 4 5 6m0-6-5 6"/></svg><span>声音关</span></button><button class="icon-button" id="fullscreen" title="全屏游戏"><span aria-hidden="true">⛶</span><span>全屏</span></button><button class="icon-button" id="help"><span class="question">?</span><span>怎么玩</span></button></div>
     </header>
     <main>
@@ -55,26 +57,32 @@
       <section class="scoreboard" aria-label="比赛状态">
         <article class="player-card cyan"><div class="player-id"><span class="car-icon" aria-hidden="true"></span><div><small>PLAYER 01</small><strong>青色闪电</strong></div></div><div class="lap" title="已完成圈数"><span id="lap1">0</span><small> / <b class="total-laps">3</b> 圈</small></div><div class="nitro"><div><small>NITRO</small><span id="boost-label1">100%</span></div><div class="boost-track"><i id="boost1"></i></div></div></article>
         <div class="race-card"><span id="race-status">等待发车</span><strong id="timer">00:00.00</strong><div class="race-actions"><button id="pause" disabled aria-label="暂停比赛">暂停 <kbd>Esc</kbd></button><button id="restart" aria-label="重新开始比赛">重开 <span aria-hidden="true">↻</span></button><button id="fullscreen-exit" class="fullscreen-exit">退出全屏</button></div></div>
-        <article class="player-card orange"><div class="player-id"><span class="car-icon" aria-hidden="true"></span><div><small>PLAYER 02</small><strong>橙色风暴</strong></div></div><div class="lap" title="已完成圈数"><span id="lap2">0</span><small> / <b class="total-laps">3</b> 圈</small></div><div class="nitro"><div><small>NITRO</small><span id="boost-label2">100%</span></div><div class="boost-track"><i id="boost2"></i></div></div></article>
+        <article class="player-card orange"><div class="player-id"><span class="car-icon" aria-hidden="true"></span><div><small id="player2-label">PLAYER 02</small><strong id="player2-name">橙色风暴</strong></div></div><div class="lap" title="已完成圈数"><span id="lap2">0</span><small> / <b class="total-laps">3</b> 圈</small></div><div class="nitro"><div><small>NITRO</small><span id="boost-label2">100%</span></div><div class="boost-track"><i id="boost2"></i></div></div></article>
       </section>
       <section class="arena" aria-label="左右分屏赛道，左侧玩家一，右侧玩家二">
         <canvas id="game" width="1200" height="700" tabindex="0" aria-label="左右分屏 3D 斜后方跟车赛车。玩家一 WASD 驾驶，左 Shift 加速；玩家二方向键驾驶，Enter 加速。">请使用支持 WebGL 的桌面浏览器。</canvas>
         <canvas id="hud" width="1200" height="700" aria-hidden="true"></canvas>
         <div class="arena-tag"><span class="live-dot"></span><span id="arena-tag-text">CHASE CAM / P1</span><b id="scene1">海岸港湾</b></div><div class="arena-meta"><span class="live-dot orange-dot"></span> CHASE CAM / P2 <b id="scene2">海岸港湾</b></div>
-        <div class="center-overlay" id="menu"><p class="eyebrow">COAST. MOUNTAINS. NEON.</p><h2>沿着风景，一路较量。</h2><p class="menu-description">一圈约 40–60 秒。长直道、连续 S 弯和发夹弯，穿越三种风景。</p><div class="route-stages" aria-label="赛道风景"><span class="coast-stage">海岸港湾</span><span class="alpine-stage">松林山谷</span><span class="city-stage">霓虹城区</span></div><div class="lap-select" role="group" aria-label="比赛圈数"><button class="selected" data-laps="3" aria-pressed="true">3 圈 <small>标准大奖赛</small></button><button data-laps="5" aria-pressed="false">5 圈 <small>耐力挑战</small></button></div><button class="start-button" id="start">开始比赛 <span>↗</span></button><small class="menu-hint">按 空格键 也可出发</small></div>
+        <div class="center-overlay" id="menu"><p class="eyebrow">COAST. MOUNTAINS. NEON.</p><h2>沿着风景，一路较量。</h2><p class="menu-description">一圈约 40–60 秒。长直道、连续 S 弯和发夹弯，穿越三种风景。</p><div class="route-stages" aria-label="赛道风景"><span class="coast-stage">海岸港湾</span><span class="alpine-stage">松林山谷</span><span class="city-stage">霓虹城区</span></div><div class="mode-select" role="group" aria-label="游戏模式"><button class="selected" data-mode="local" aria-pressed="true">本地双人</button><button data-mode="ai" aria-pressed="false">单人挑战 AI</button></div><p id="mode-description" class="mode-description">与身边的朋友，共用一块键盘。</p><div class="lap-select" role="group" aria-label="比赛圈数"><button class="selected" data-laps="3" aria-pressed="true">3 圈 <small>标准大奖赛</small></button><button data-laps="5" aria-pressed="false">5 圈 <small>耐力挑战</small></button></div><button class="start-button" id="start">开始比赛 <span>↗</span></button><small class="menu-hint">按 空格键 也可出发</small></div>
         <div class="graphics-note hidden" id="graphics-note" role="alert">无法启用 3D 画面。请开启浏览器硬件加速，再刷新页面。</div>
         <div class="countdown hidden" id="countdown" aria-live="polite"><strong>3</strong><span>READY TO RACE</span></div>
         <div class="center-overlay hidden" id="pause-panel"><p class="eyebrow">TAKE A BREATHER</p><h2>稍作停留。</h2><p class="menu-description">准备好后，继续你们的对决。</p><button class="start-button" id="resume">继续比赛 <span>→</span></button><small class="menu-hint">按 Esc 或 空格键 继续</small></div>
-        <div class="center-overlay hidden" id="result" aria-live="polite"><p class="eyebrow">CHECKERED FLAG</p><h2 id="winner-name">青色闪电获胜！</h2><p class="menu-description" id="result-subtitle"></p><div class="results-grid"><div><small>完赛用时</small><strong id="finish-time">00:00.00</strong></div><div><small>最快单圈</small><strong id="best-lap">—</strong></div></div><button class="start-button" id="again">再来一局 <span>↗</span></button><button class="text-button" id="back-menu">返回发车区</button></div>
+        <div class="center-overlay hidden" id="result" aria-live="polite"><p class="eyebrow">CHECKERED FLAG</p><h2 id="winner-name">青色闪电获胜！</h2><p class="menu-description" id="result-subtitle"></p><div class="results-grid"><div><small>完赛用时</small><strong id="finish-time">00:00.00</strong></div><div><small>最快单圈</small><strong id="best-lap">—</strong></div></div><p id="record-result-status" class="record-result-status" aria-live="polite"></p><button id="qualify-retry" class="text-button hidden" type="button">重试上榜资格</button><button class="start-button" id="again">再来一局 <span>↗</span></button><button class="text-button" id="back-menu">返回发车区</button></div>
         <div class="speed-readout cyan"><small>P1</small><strong id="speed1">0</strong><span>KM/H</span><b id="offroad1"></b></div><div class="speed-readout orange"><small>P2</small><strong id="speed2">0</strong><span>KM/H</span><b id="offroad2"></b></div>
       </section>
+      <dialog id="record-dialog" aria-labelledby="record-title" aria-describedby="record-message">
+        <p class="eyebrow">A PLACE ON THE PODIUM</p><h2 id="record-title">写下你的名字。</h2>
+        <p id="record-message" aria-live="polite">留下昵称，记录这次完赛成绩。</p>
+        <form id="record-form"><label for="record-name">车手昵称</label><input id="record-name" name="name" autocomplete="nickname" spellcheck="false" placeholder="最多 16 个字符" aria-describedby="record-name-count"><small id="record-name-count">0 / 16</small><button class="start-button" id="record-submit" type="submit">记录我的成绩</button><button class="text-button" id="record-skip" type="button">这次跳过</button></form>
+      </dialog>
       </div>
-      <section class="controls" aria-label="键盘操作说明"><div class="control-player cyan"><span class="player-chip">P1</span><div><strong>青色闪电</strong><div class="key-row"><span class="key-group"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span><span>驾驶</span><kbd class="wide">左 Shift</kbd><span>氮气</span><span class="rescue-key"><kbd>Q</kbd> 复位</span></div></div></div><div class="race-tip"><span aria-hidden="true">↗</span><p>直道加速，弯道松油<small>斜后方跟车 · 弯前注意减速</small></p></div><div class="control-player orange"><span class="player-chip">P2</span><div><strong>橙色风暴</strong><div class="key-row"><span class="key-group"><kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd></span><span>驾驶</span><kbd class="wide">Enter</kbd><span>氮气</span><span class="rescue-key"><kbd>/</kbd> 复位</span></div></div></div></section>
+      <section class="controls" aria-label="键盘操作说明"><div class="control-player cyan"><span class="player-chip">P1</span><div><strong>青色闪电</strong><div class="key-row"><span class="key-group"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span><span>驾驶</span><kbd class="wide">左 Shift</kbd><span>氮气</span><span class="rescue-key"><kbd>Q</kbd> 复位</span></div></div></div><div class="race-tip"><span aria-hidden="true">↗</span><p>直道加速，弯道松油<small>斜后方跟车 · 弯前注意减速</small></p></div><div class="control-player orange"><span class="player-chip" id="control-player2-chip">P2</span><div><strong id="control-player2-name">橙色风暴</strong><p id="ai-control-note" class="ai-control-note hidden">AI 自动驾驶 · 你使用 WASD / 左 Shift / Q</p><div class="key-row" id="player2-controls"><span class="key-group"><kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd></span><span>驾驶</span><kbd class="wide">Enter</kbd><span>氮气</span><span class="rescue-key"><kbd>/</kbd> 复位</span></div></div></div></section>
       <p class="mobile-notice">连接键盘或使用电脑，即可开始双人对战。</p>
+      <section class="leaderboard" aria-labelledby="leaderboard-title"><div class="leaderboard-heading"><div><p class="eyebrow">THE GLOBAL FAST FIVE</p><h2 id="leaderboard-title">全站速度榜<span>TOP 05</span></h2></div><div class="leaderboard-tabs" role="tablist" aria-label="排行榜圈数"><button id="board-3" role="tab" aria-selected="true" class="selected">3 圈榜</button><button id="board-5" role="tab" aria-selected="false">5 圈榜</button></div></div><p class="leaderboard-intro">以整场完赛时间一决高下。真人成绩进入前五，即可留下昵称；AI 不参与排名。</p><ol id="leaderboard-list" aria-label="3 圈全站最快五名"></ol><div class="leaderboard-state"><p id="leaderboard-status" aria-live="polite">正在读取全站排行榜…</p><button id="leaderboard-retry" class="text-button hidden" type="button">重新连接</button></div></section>
     </main>
-    <footer><span>BUILT FOR A LITTLE FRIENDLY RIVALRY.</span><span>左右分屏 · 离线可用 · 无需账号 <i></i> TWIN TURBO / 2026</span></footer>
+    <footer><span>BUILT FOR A LITTLE FRIENDLY RIVALRY.</span><span>本地对战 · 在线全站榜 · 无需账号 <i></i> TWIN TURBO / 2026</span></footer>
   </div>
-  <dialog id="help-dialog" aria-labelledby="help-title"><button class="close-dialog" id="close-help" aria-label="关闭操作说明">×</button><p class="eyebrow">DRIVER'S BRIEFING</p><h2 id="help-title">发车前，了解一下。</h2><p>两位玩家共用键盘，各占半个屏幕，使用斜后方 3D 镜头跟随自己的赛车。沿路线箭头驾驶，先完成全部圈数的玩家获胜。</p><div class="help-players"><div class="cyan"><strong>01 青色闪电</strong><p><kbd>W</kbd> 加速 · <kbd>S</kbd> 刹车 / 倒车<br><kbd>A</kbd><kbd>D</kbd> 转向 · <kbd>左 Shift</kbd> 氮气</p></div><div class="orange"><strong>02 橙色风暴</strong><p><kbd>↑</kbd> 加速 · <kbd>↓</kbd> 刹车 / 倒车<br><kbd>←</kbd><kbd>→</kbd> 转向 · <kbd>Enter</kbd> 氮气</p></div></div><p class="help-tip">这条赛道有长直道、连续 S 弯和回头弯。弯前松油或轻点刹车，出弯再用氮气。氮气会自动恢复。树木、建筑与护栏会挡住车辆，撞上会减速；轻微压路肩仍能正常计圈，大幅抄近路不能完成一圈。卡住时，玩家一按 <kbd>Q</kbd>、玩家二按 <kbd>/</kbd> 返回赛道，并承受 2 秒罚停。</p><p><kbd>Esc</kbd> 暂停 / 继续 · 离开游戏窗口会自动暂停。</p><button class="start-button" id="help-done">准备好了 <span>✓</span></button></dialog>
+  <dialog id="help-dialog" aria-labelledby="help-title"><button class="close-dialog" id="close-help" aria-label="关闭操作说明">×</button><p class="eyebrow">DRIVER'S BRIEFING</p><h2 id="help-title">发车前，了解一下。</h2><p id="help-mode-description">两位玩家共用键盘，各占半个屏幕，使用斜后方 3D 镜头跟随自己的赛车。沿路线箭头驾驶，先完成全部圈数的玩家获胜。</p><div class="help-players"><div class="cyan"><strong>01 青色闪电</strong><p><kbd>W</kbd> 加速 · <kbd>S</kbd> 刹车 / 倒车<br><kbd>A</kbd><kbd>D</kbd> 转向 · <kbd>左 Shift</kbd> 氮气</p></div><div class="orange"><strong>02 橙色风暴</strong><p><kbd>↑</kbd> 加速 · <kbd>↓</kbd> 刹车 / 倒车<br><kbd>←</kbd><kbd>→</kbd> 转向 · <kbd>Enter</kbd> 氮气</p></div></div><p class="help-tip">这条赛道有长直道、连续 S 弯和回头弯。弯前松油或轻点刹车，出弯再用氮气。氮气会自动恢复。树木、建筑与护栏会挡住车辆，撞上会减速；轻微压路肩仍能正常计圈，大幅抄近路不能完成一圈。卡住时，玩家一按 <kbd>Q</kbd>、玩家二按 <kbd>/</kbd> 返回赛道，并承受 2 秒罚停。</p><p><kbd>Esc</kbd> 暂停 / 继续 · 离开游戏窗口会自动暂停。</p><button class="start-button" id="help-done">准备好了 <span>✓</span></button></dialog>
   <script>
 const Collisions = (() => {
 /** Static ground obstacles in physics x/y coordinates (rendering world x/z). */
@@ -1263,7 +1271,425 @@ class RaceRenderer {
 
 return {RaceRenderer, sceneWeights};
 })(Engine);
-(({RaceEngine, TRACK, trackPoint, projectTrack, mod}, {RaceRenderer, sceneWeights}) => {
+const AI = (({RaceEngine, TRACK, trackPoint, projectTrack, mod}) => {
+/** Fair, deterministic computer driver. Every movement uses the player's controls. */
+
+const TAU=Math.PI*2;
+const approach=(value,target,amount)=>value<target?Math.min(target,value+amount):Math.max(target,value-amount);
+const angleDifference=(from,to)=>mod(to-from+Math.PI,TAU)-Math.PI;
+
+class RaceAI {
+  constructor({carId=2}={}) {this.carId=carId;this.reset();}
+
+  reset() {
+    this.elapsed=0;this.rescues=0;
+    this._lane=this.carId===1?24:-24;
+    this._lastS=null;this._stuckFor=0;this._missedFor=0;this._offroadFor=0;
+    this._boostRemaining=0;this._boostCooldown=15;
+  }
+
+  update(engine,dt=1/60) {
+    const keys=new Set();
+    if(engine.state!=='racing'||!Number.isFinite(dt)||dt<=0)return keys;
+    const car=engine.cars.find(candidate=>candidate.id===this.carId);
+    if(!car||car.finished)return keys;
+    const tick=Math.min(dt,.1);
+    this.elapsed+=tick;
+    const projection=projectTrack(car.x,car.y);
+    const advanced=this._lastS===null?0:mod(projection.s-this._lastS+TRACK.length/2,TRACK.length)-TRACK.length/2;
+    this._lastS=projection.s;
+    if(car.rescueCooldown>0) {
+      this._stuckFor=0;this._missedFor=0;this._offroadFor=0;this._boostRemaining=0;
+      return keys;
+    }
+    this._stuckFor=advanced<tick*12?this._stuckFor+tick:Math.max(0,this._stuckFor-tick*2);
+    this._missedFor=car.missedCheckpoint?this._missedFor+tick:0;
+    this._offroadFor=projection.distance>TRACK.roadWidth/2?this._offroadFor+tick:0;
+    if(this._stuckFor>4.2||this._missedFor>2.5||this._offroadFor>3.5) {
+      engine.rescue(this.carId);
+      this.rescues++;
+      this._lastS=projectTrack(car.x,car.y).s;
+      this._stuckFor=0;this._missedFor=0;this._offroadFor=0;this._boostRemaining=0;
+      return keys;
+    }
+
+    const upcoming=[projection,trackPoint(projection.s+150),trackPoint(projection.s+330)];
+    const curvature=Math.max(...upcoming.map(point=>Math.abs(point.curvature)));
+    // A little breathing room in corners and small line variations make a
+    // beatable club-level opponent, without hidden speed or grip advantages.
+    let targetSpeed=(curvature>.00165?329:curvature>.0002?340:351)+Math.sin(this.elapsed*.53)*2.5;
+    let desiredLane=(this.carId===1?24:-24)+Math.sin(this.elapsed*.36)*1.8;
+    let traffic=false;
+    const forward=[Math.cos(projection.angle),Math.sin(projection.angle)];
+    for(const other of engine.cars) {
+      if(other.id===this.carId)continue;
+      const dx=other.x-car.x,dy=other.y-car.y;
+      const ahead=dx*forward[0]+dy*forward[1],side=-dx*forward[1]+dy*forward[0];
+      if(ahead<-45||ahead>330||Math.abs(side)>65)continue;
+      const otherLane=projectTrack(other.x,other.y).offset;
+      if(Math.abs(side)<40) {
+        // Plan an ordinary pass, and lift/brake while there is not enough room.
+        desiredLane=otherLane>=0?-38:38;
+        if(ahead>0&&Math.abs(side)<37) {
+          targetSpeed=Math.min(targetSpeed,Math.max(0,other.speed)+Math.max(0,ahead-80)*1.1);
+          traffic=true;
+        }
+      }
+    }
+    this._lane=approach(this._lane,desiredLane,tick*22);
+    const lookAhead=75+Math.abs(car.speed)*.14;
+    const target=trackPoint(projection.s+lookAhead,this._lane);
+    const error=angleDifference(car.angle,Math.atan2(target.y-car.y,target.x-car.x));
+    const controls=this.carId===1
+      ?{forward:'KeyW',brake:'KeyS',left:'KeyA',right:'KeyD',boost:'ShiftLeft'}
+      :{forward:'ArrowUp',brake:'ArrowDown',left:'ArrowLeft',right:'ArrowRight',boost:'Enter'};
+    if(error>.025)keys.add(controls.right);
+    if(error<-.025)keys.add(controls.left);
+    if(Math.abs(error)>.5)targetSpeed=Math.min(targetSpeed,150);
+    if(projection.distance>TRACK.roadWidth/2)targetSpeed=Math.min(targetSpeed,125);
+
+    this._boostCooldown=Math.max(0,this._boostCooldown-tick);
+    this._boostRemaining=Math.max(0,this._boostRemaining-tick);
+    const straight=curvature<.00001&&Math.abs(trackPoint(projection.s+500).curvature)<.00001;
+    const canBoost=straight&&!traffic&&Math.abs(error)<.035&&car.speed>290&&car.boost>45&&!car.offroad;
+    if(canBoost&&this._boostCooldown===0) {
+      this._boostRemaining=.3;this._boostCooldown=20;
+    }
+    if(this._boostRemaining>0&&canBoost) {
+      keys.add(controls.forward);keys.add(controls.boost);
+    } else if(car.speed<targetSpeed-1)keys.add(controls.forward);
+    else if(car.speed>targetSpeed+14)keys.add(controls.brake);
+    return keys;
+  }
+}
+
+return {RaceAI};
+})(Engine);
+const Leaderboard = (() => {
+/** Pure leaderboard rules shared by the game and the score service. */
+const LEADERBOARD_VERSION = 'twin-turbo-technical-v2-363-517';
+const LEADERBOARD_LIMIT = 5;
+const SUPPORTED_LAPS = [3, 5];
+const CONTROL_CHARACTERS = /[\p{Cc}\p{Cf}\p{Cs}]/gu;
+
+/** Keep names as plain text; render them with textContent in any UI. */
+function normalizeName(value) {
+  if (typeof value !== 'string') return '';
+  return Array.from(value.replace(CONTROL_CHARACTERS, '').trim()).slice(0, 16).join('').trim();
+}
+
+function humanCompetitor(value) {
+  return (value.playerId === 1 || value.playerId === 2)
+    && (value.mode === 'local' || value.mode === 'ai')
+    && !(value.mode === 'ai' && value.playerId === 2)
+    && value.isAI !== true && value.isHuman !== false;
+}
+
+function validScore(value) {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    && SUPPORTED_LAPS.includes(value.laps)
+    && Number.isSafeInteger(value.timeMs) && value.timeMs > 0
+    && humanCompetitor(value);
+}
+
+function normalizeRecord(value) {
+  if (!validScore(value)) return null;
+  const name = normalizeName(value.name);
+  const id = typeof value.id === 'string' ? value.id.trim() : '';
+  if (!name || !id || id.length > 128 || id.replace(CONTROL_CHARACTERS, '') !== id
+    || !Number.isSafeInteger(value.createdAt) || value.createdAt < 0) return null;
+  return { id, name, timeMs: value.timeMs, laps: value.laps,
+    playerId: value.playerId, mode: value.mode, createdAt: value.createdAt };
+}
+
+/**
+ * Copy, validate and order records; without laps, return the 3-lap board then
+ * the 5-lap board. Equal times retain their existing order, even if wall-clock
+ * timestamps move backwards. IDs are deduplicated within each lap category.
+ */
+function normalizeEntries(entries, laps) {
+  if (!Array.isArray(entries) || (laps !== undefined && !SUPPORTED_LAPS.includes(laps))) return [];
+  const seen = new Set(), records = [];
+  for (const value of entries) {
+    const record = normalizeRecord(value);
+    if (!record || (laps !== undefined && record.laps !== laps)) continue;
+    const identity = `${record.laps}:${record.id}`;
+    if (seen.has(identity)) continue;
+    seen.add(identity); records.push(record);
+  }
+  records.sort((a, b) => a.laps - b.laps || a.timeMs - b.timeMs);
+  const count = new Map();
+  return records.filter(record => {
+    const rank = (count.get(record.laps) || 0) + 1;
+    count.set(record.laps, rank);
+    return rank <= LEADERBOARD_LIMIT;
+  });
+}
+
+/** Return a one-based rank only for a finished human result that makes top 5. */
+function qualifyingRank(entries, result) {
+  if (!validScore(result) || result.finished !== true) return null;
+  const board = normalizeEntries(entries, result.laps);
+  // A new tie follows every existing tie; matching fifth place is not enough.
+  const rank = board.filter(entry => entry.timeMs <= result.timeMs).length + 1;
+  return rank <= LEADERBOARD_LIMIT ? rank : null;
+}
+
+/**
+ * Insert an already verified finished score as a canonical stored record.
+ * The service must verify the finish and qualification inside its transaction;
+ * this data function cannot establish whether a submitted game really finished.
+ * Existing same-ID records win, so retrying one submission never duplicates it.
+ */
+function insertRecord(entries, record) {
+  const existing = normalizeEntries(entries), normalized = normalizeRecord(record);
+  if (!normalized || existing.some(entry => entry.laps === normalized.laps && entry.id === normalized.id)) return existing;
+  return normalizeEntries([...existing, normalized]);
+}
+
+return {LEADERBOARD_VERSION, LEADERBOARD_LIMIT, normalizeName, normalizeEntries, qualifyingRank, insertRecord};
+})();
+const Online = (({LEADERBOARD_VERSION, LEADERBOARD_LIMIT, normalizeName, normalizeEntries, qualifyingRank, insertRecord}) => {
+
+const API_ORIGIN = 'https://twin-turbo-records-yiiiiming.heym0701.chatgpt.site';
+const scoreTime = milliseconds => {
+  const centiseconds = Math.round(milliseconds / 10);
+  return `${String(Math.floor(centiseconds / 6000)).padStart(2, '0')}:${((centiseconds % 6000) / 100).toFixed(2).padStart(5, '0')}`;
+};
+const uniqueId = () => globalThis.crypto?.randomUUID?.()
+  || 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, token => {
+    const n = Math.floor(Math.random() * 16);
+    return (token === 'x' ? n : (n & 3) | 8).toString(16);
+  });
+
+/** Online scores only. Local race results remain visible if the service fails. */
+class LeaderboardClient {
+  constructor({ document, fetchImpl = globalThis.fetch, origin = API_ORIGIN, timeoutMs = 8000, onOpen = () => {} } = {}) {
+    this.document = document;
+    this.fetchImpl = fetchImpl;
+    this.origin = origin.replace(/\/$/, '');
+    this.timeoutMs = timeoutMs;
+    this.onOpen = onOpen;
+    this.laps = 3;
+    this.entries = [];
+    this.boardRequest = 0;
+    this.raceToken = 0;
+    this.current = null;
+    this.qualified = false;
+    this.submitting = false;
+    this.checking = false;
+    this.done = false;
+    this.composing = false;
+    this.submissionName = null;
+  }
+
+  node(id) { return this.document.getElementById(id); }
+  get busyDialog() { return this.node('record-dialog').open; }
+
+  init() {
+    for (const laps of [3, 5]) this.node('board-' + laps).addEventListener('click', () => { void this.load(laps); });
+    this.node('leaderboard-retry').addEventListener('click', () => { void this.load(); });
+    this.node('qualify-retry').addEventListener('click', () => { void this.qualify(); });
+    this.node('record-form').addEventListener('submit', event => {
+      event.preventDefault();
+      if (!this.composing) void this.save();
+    });
+    this.node('record-skip').addEventListener('click', () => this.skip());
+    this.node('record-dialog').addEventListener('cancel', event => {
+      event.preventDefault();
+      if (!this.submitting) this.skip();
+    });
+    const input = this.node('record-name');
+    input.addEventListener('compositionstart', () => { this.composing = true; });
+    input.addEventListener('compositionend', () => { this.composing = false; this.limitName(); });
+    input.addEventListener('input', event => { if (!event.isComposing && !this.composing) this.limitName(); });
+    return this.load();
+  }
+
+  limitName() {
+    const input = this.node('record-name');
+    input.value = Array.from(input.value).slice(0, 16).join('');
+    this.node('record-name-count').textContent = `${Array.from(input.value).length} / 16`;
+  }
+
+  async request(path, body) {
+    const controller = new AbortController();
+    let timer;
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => { controller.abort(); reject(new Error('连接超时，请重试。')); }, this.timeoutMs);
+    });
+    try {
+      const task = Promise.resolve().then(() => this.fetchImpl(this.origin + path, {
+        method: body ? 'POST' : 'GET', signal: controller.signal,
+        headers: body ? { 'Content-Type': 'application/json' } : {},
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      })).then(async response => {
+        const data = await response.json();
+        if (!response.ok) {
+          const error = new Error(response.status === 409 ? '排名已更新' : '暂时无法连接排行榜，请重试。');
+          error.status = response.status; error.payload = data; throw error;
+        }
+        return data;
+      });
+      return await Promise.race([task, timeout]);
+    } finally { clearTimeout(timer); }
+  }
+
+  tabs(laps) {
+    this.laps = laps;
+    for (const count of [3, 5]) {
+      const selected = count === laps;
+      this.node('board-' + count).classList.toggle('selected', selected);
+      this.node('board-' + count).setAttribute('aria-selected', String(selected));
+    }
+    this.node('leaderboard-list').setAttribute('aria-label', `${laps} 圈全站最快五名`);
+  }
+
+  render(entries) {
+    this.entries = normalizeEntries(entries, this.laps);
+    const list = this.node('leaderboard-list');
+    list.replaceChildren();
+    for (const [index, record] of this.entries.entries()) {
+      const row = this.document.createElement('li'); row.className = 'leaderboard-row';
+      const rank = this.document.createElement('span'); rank.className = 'record-rank'; rank.textContent = String(index + 1).padStart(2, '0');
+      const identity = this.document.createElement('div'); identity.className = 'record-identity';
+      const name = this.document.createElement('strong'); name.textContent = record.name;
+      const mode = this.document.createElement('small'); mode.textContent = record.mode === 'ai' ? '单人挑战 AI' : '本地双人';
+      identity.appendChild(name); identity.appendChild(mode);
+      const time = this.document.createElement('strong'); time.className = 'record-time'; time.textContent = scoreTime(record.timeMs);
+      row.appendChild(rank); row.appendChild(identity); row.appendChild(time); list.appendChild(row);
+    }
+    this.node('leaderboard-status').textContent = this.entries.length
+      ? `${this.laps} 圈 · 按整场完赛时间排名` : `${this.laps} 圈榜单还空着，来创造第一个纪录。`;
+    this.node('leaderboard-retry').classList.add('hidden');
+  }
+
+  async load(laps = this.laps) {
+    if (![3, 5].includes(laps)) return;
+    const request = ++this.boardRequest;
+    this.tabs(laps);
+    this.node('leaderboard-list').replaceChildren();
+    this.node('leaderboard-status').textContent = '正在读取全站排行榜…';
+    this.node('leaderboard-retry').classList.add('hidden');
+    try {
+      const data = await this.request(`/api/leaderboard?laps=${laps}&version=${encodeURIComponent(LEADERBOARD_VERSION)}`);
+      if (request !== this.boardRequest) return;
+      if (data.version !== LEADERBOARD_VERSION || data.laps !== laps) throw new Error('榜单版本已更新，请刷新游戏后重试。');
+      this.render(data.entries);
+    } catch (error) {
+      if (request !== this.boardRequest) return;
+      this.node('leaderboard-status').textContent = error.message.includes('版本') ? error.message : '暂时无法连接全站排行榜。游戏可照常进行，请联网后重试。';
+      this.node('leaderboard-retry').classList.remove('hidden');
+    }
+  }
+
+  newRace() {
+    this.raceToken++;
+    this.current = null; this.done = false; this.qualified = false; this.checking = false; this.submitting = false; this.composing = false;
+    this.submissionName = null;
+    if (this.busyDialog) this.node('record-dialog').close();
+    this.node('record-result-status').textContent = '';
+    this.node('qualify-retry').classList.add('hidden');
+  }
+
+  async considerResult(result) {
+    if (this.current || result?.finished !== true || ![3, 5].includes(result.laps)
+      || ![1, 2].includes(result.playerId) || !['local', 'ai'].includes(result.mode)
+      || (result.mode === 'ai' && result.playerId === 2)
+      || !Number.isSafeInteger(result.timeMs) || result.timeMs <= 0) return;
+    this.current = { finished: true, laps: result.laps, timeMs: result.timeMs,
+      playerId: result.playerId, mode: result.mode, version: LEADERBOARD_VERSION, id: uniqueId() };
+    this.node('record-name').value = ''; this.limitName();
+    return this.qualify();
+  }
+
+  async qualify() {
+    if (!this.current || this.done || this.checking || this.qualified) return;
+    const token = this.raceToken, result = this.current;
+    this.checking = true;
+    this.node('record-result-status').textContent = '正在确认全站前五资格…';
+    this.node('qualify-retry').classList.add('hidden');
+    try {
+      const { id, ...payload } = result;
+      const data = await this.request('/api/qualify', payload);
+      if (token !== this.raceToken) return;
+      if (this.laps === result.laps && Array.isArray(data.entries)) this.render(data.entries);
+      if (!Number.isInteger(data.rank) || data.rank < 1 || data.rank > 5) {
+        this.done = true;
+        this.node('record-result-status').textContent = '本次未进入全站前五，下一局继续挑战。';
+        return;
+      }
+      this.qualified = true;
+      this.node('record-title').textContent = `进入 ${result.laps} 圈榜第 ${data.rank} 名！`;
+      this.node('record-message').textContent = '留下一个昵称，将这次完赛成绩记入全站榜单。';
+      this.node('record-result-status').textContent = '已进入全站前五，填写昵称后提交。';
+      this.node('record-submit').disabled = false; this.node('record-skip').disabled = false;
+      this.node('record-name').disabled = false;
+      this.node('record-submit').textContent = '记录我的成绩'; this.node('record-skip').textContent = '这次跳过';
+      this.onOpen(); this.node('record-dialog').showModal(); this.node('record-name').focus();
+    } catch {
+      if (token !== this.raceToken) return;
+      this.node('record-result-status').textContent = '成绩已保留在本次结果中，暂时无法确认上榜资格。联网后可重试。';
+      this.node('qualify-retry').classList.remove('hidden');
+    } finally { if (token === this.raceToken) this.checking = false; }
+  }
+
+  skip() {
+    if (this.submitting) return;
+    const alreadyDone = this.done;
+    this.done = true; this.qualified = false;
+    if (this.busyDialog) this.node('record-dialog').close();
+    if (!alreadyDone) this.node('record-result-status').textContent = '已跳过本次记录，比赛成绩仍保留在上方。';
+    this.node('qualify-retry').classList.add('hidden');
+  }
+
+  async save() {
+    if (!this.current || !this.qualified || this.done || this.submitting || this.composing) return;
+    // A lost response may follow a successful insert. Every retry must keep
+    // exactly the first submitted name and ID to remain strictly idempotent.
+    const name = this.submissionName || normalizeName(this.node('record-name').value);
+    if (!name) { this.node('record-message').textContent = '请输入一个昵称（最多 16 个字符）。'; this.node('record-name').focus(); return; }
+    this.node('record-name').value = name; this.limitName();
+    this.submissionName = name;
+    const token = this.raceToken, result = this.current;
+    this.submitting = true;
+    this.node('record-submit').disabled = true; this.node('record-skip').disabled = true; this.node('record-name').disabled = true;
+    this.node('record-message').textContent = '正在保存到全站榜单…';
+    try {
+      const data = await this.request('/api/records', { ...result, name });
+      if (token !== this.raceToken) return;
+      if (data.saved !== true) throw new Error('未确认保存');
+      this.done = true; this.qualified = false;
+      this.node('record-result-status').textContent = `「${name}」的成绩已记入 ${result.laps} 圈全站榜。`;
+      this.node('record-dialog').close();
+      this.tabs(result.laps); this.render(data.entries);
+      await this.load(result.laps);
+    } catch (error) {
+      if (token !== this.raceToken) return;
+      if (error.status === 409 && error.payload?.error === 'rank_changed') {
+        this.done = true; this.qualified = false;
+        this.node('record-message').textContent = '刚刚有更快成绩进入前五，这次未保存。再来一局挑战吧。';
+        this.node('record-result-status').textContent = '榜单刚刚更新，本次成绩已跌出前五，未保存。';
+        this.node('record-skip').textContent = '返回比赛结果';
+        this.tabs(result.laps); this.render(error.payload.entries);
+      } else {
+        this.node('record-message').textContent = '未能确认保存。已保留并锁定原昵称与成绩，请联网后重试；不会重复记录。';
+        this.node('record-submit').textContent = '重试保存';
+      }
+    } finally {
+      if (token === this.raceToken) {
+        this.submitting = false;
+        this.node('record-submit').disabled = this.done;
+        this.node('record-name').disabled = this.done || this.submissionName !== null;
+        this.node('record-skip').disabled = false;
+      }
+    }
+  }
+}
+
+return {LeaderboardClient};
+})(Leaderboard);
+(({RaceEngine, TRACK, trackPoint, projectTrack, mod}, {RaceRenderer, sceneWeights}, {RaceAI}, {LeaderboardClient}) => {
 
 const $ = id => document.getElementById(id);
 const canvas = $('game');
@@ -1273,9 +1699,13 @@ const engine = new RaceEngine();
 const renderer = new RaceRenderer(canvas, { sceneUrls: globalThis.TWIN_SCENE_ART });
 engine.setObstacles(renderer.obstacles || []);
 const keys = new Set();
+const ai = new RaceAI();
+const leaderboard = new LeaderboardClient({ document, onOpen: () => keys.clear() });
+void leaderboard.init();
 const colors = ['#51dfe5', '#ff9870'];
 const names = ['青色闪电', '橙色风暴'];
-let selectedLaps = 3, lastTime = performance.now(), lastState = '', lastCount = 0;
+let selectedLaps = 3, selectedMode = 'local', raceMode = 'local', lastAIRescues = 0;
+let lastTime = performance.now(), lastState = '', lastCount = 0;
 let goUntil = 0, soundEnabled = false, audio = null, audioNodes = [];
 let lastLaps = [0, 0], notices = ['', ''], noticeUntil = [0, 0], toastTime = 0;
 const tau = Math.PI * 2;
@@ -1386,6 +1816,11 @@ function updateUI(now) {
     if(engine.state==='racing' && lastState==='countdown'){goUntil=now+1;tone(880,.2,.08);}
     if(engine.state==='finished'){
       const winner=engine.winner;$('winner-name').textContent=names[winner.id-1]+'获胜！';$('winner-name').style.color=colors[winner.id-1];$('result-subtitle').textContent=`PLAYER 0${winner.id} · 率先完成 ${engine.laps} 圈`;$('finish-time').textContent=fmt(winner.finishTime);$('best-lap').textContent=winner.bestLap===null?'—':fmt(winner.bestLap);keys.clear();tone(523,.2,.06);setTimeout(()=>tone(659,.2,.06),140);setTimeout(()=>tone(784,.35,.06),280);
+      const finisher = [winner, ...engine.cars].find(car => car?.finished === true
+        && Number.isFinite(car.finishTime) && !(raceMode === 'ai' && car.id === 2));
+      if (finisher) void leaderboard.considerResult({ finished: true, laps: engine.laps,
+        timeMs: Math.round(finisher.finishTime * 1000), playerId: finisher.id, mode: raceMode });
+      else $('record-result-status').textContent = 'AI 不参与全站排名。下一局争取率先冲线！';
     }
     lastState=engine.state;
   }
@@ -1398,7 +1833,7 @@ function updateUI(now) {
 function initAudio(){if(audio)return;const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)return;audio=new Audio();for(let i=0;i<2;i++){const oscillator=audio.createOscillator(),filter=audio.createBiquadFilter(),gain=audio.createGain();oscillator.type='sawtooth';filter.type='lowpass';filter.frequency.value=360;gain.gain.value=0;oscillator.connect(filter);filter.connect(gain);gain.connect(audio.destination);oscillator.start();audioNodes.push({oscillator,gain,filter});}}
 function tone(frequency,length,volume){if(!soundEnabled||!audio)return;const oscillator=audio.createOscillator(),gain=audio.createGain();oscillator.type='sine';oscillator.frequency.value=frequency;gain.gain.setValueAtTime(volume,audio.currentTime);gain.gain.exponentialRampToValueAtTime(.001,audio.currentTime+length);oscillator.connect(gain);gain.connect(audio.destination);oscillator.start();oscillator.stop(audio.currentTime+length);}
 function updateAudio(){if(!audio)return;audioNodes.forEach((node,i)=>{const car=engine.cars[i];node.oscillator.frequency.setTargetAtTime(36+Math.abs(car.speed)*.24+(car.boosting?15:0),audio.currentTime,.12);node.filter.frequency.setTargetAtTime(160+Math.abs(car.speed)*1.3,audio.currentTime,.15);node.gain.gain.setTargetAtTime(soundEnabled&&engine.state==='racing'?.012+Math.abs(car.speed)*.00005:0,audio.currentTime,.08);});}
-function begin(){if($('help-dialog').open||!renderer.available)return;engine.start(selectedLaps);keys.clear();lastLaps=[0,0];notices=['',''];lastCount=0;renderer.resetCameras(engine);goUntil=0;canvas.focus({preventScroll:true});if(soundEnabled){initAudio();audio?.resume();}}
+function begin(){if($('help-dialog').open||leaderboard.busyDialog||!renderer.available)return;leaderboard.newRace();raceMode=selectedMode;engine.start(selectedLaps);ai.reset();lastAIRescues=0;keys.clear();lastLaps=[0,0];notices=['',''];lastCount=0;renderer.resetCameras(engine);goUntil=0;canvas.focus({preventScroll:true});if(soundEnabled){initAudio();audio?.resume();}}
 function togglePause(){
   if (engine.state === 'paused') {
     engine.resume();
@@ -1409,8 +1844,28 @@ function togglePause(){
 function rescue(id){engine.rescue(id);renderer.resetCameras(engine,id);notices[id-1]='返回赛道 · 罚停 2 秒';noticeUntil[id-1]=toastTime+2.2;}
 $('start').addEventListener('click',begin);$('again').addEventListener('click',begin);$('restart').addEventListener('click',begin);
 $('resume').addEventListener('click',()=>{keys.clear();engine.resume();canvas.focus({preventScroll:true});});$('pause').addEventListener('click',togglePause);
-$('back-menu').addEventListener('click',()=>{engine.reset();keys.clear();renderer.resetCameras(engine);});
+$('back-menu').addEventListener('click',()=>{leaderboard.newRace();engine.reset();ai.reset();lastAIRescues=0;keys.clear();renderer.resetCameras(engine);});
 document.querySelectorAll('[data-laps]').forEach(button=>button.addEventListener('click',()=>{selectedLaps=Number(button.dataset.laps);document.querySelectorAll('[data-laps]').forEach(b=>{const selected=b===button;b.classList.toggle('selected',selected);b.setAttribute('aria-pressed',String(selected));});document.querySelectorAll('.total-laps').forEach(el=>el.textContent=selectedLaps);}));
+document.querySelectorAll('[data-mode]').forEach(button => button.addEventListener('click', () => {
+  if (engine.state !== 'menu') return;
+  selectedMode = button.dataset.mode === 'ai' ? 'ai' : 'local';
+  const solo = selectedMode === 'ai';
+  names[1] = solo ? 'AI · 橙色风暴' : '橙色风暴';
+  $('player2-name').textContent = names[1]; $('control-player2-name').textContent = names[1];
+  $('player2-label').textContent = solo ? 'AI DRIVER' : 'PLAYER 02';
+  $('control-player2-chip').textContent = solo ? 'AI' : 'P2';
+  $('mode-label').textContent = solo ? '单人挑战 AI' : '双人分屏';
+  $('mode-english').textContent = solo ? 'SINGLE PLAYER' : 'LOCAL MULTIPLAYER';
+  $('mode-description').textContent = solo ? '你驾驶青色赛车，用 WASD 挑战 AI。' : '与身边的朋友，共用一块键盘。';
+  $('player2-controls').classList.toggle('hidden', solo); $('ai-control-note').classList.toggle('hidden', !solo);
+  $('help-mode-description').textContent = solo
+    ? '你驾驶左侧青色赛车，使用 WASD、左 Shift 和 Q；右侧橙色赛车由 AI 驾驶。两车遵循相同物理和赛道规则，先完成全部圈数获胜。'
+    : '两位玩家共用键盘，各占半个屏幕，使用斜后方 3D 镜头跟随自己的赛车。沿路线箭头驾驶，先完成全部圈数的玩家获胜。';
+  document.querySelectorAll('[data-mode]').forEach(item => {
+    const selected = item.dataset.mode === selectedMode;
+    item.classList.toggle('selected', selected); item.setAttribute('aria-pressed', String(selected));
+  });
+}));
 $('sound').addEventListener('click',()=>{soundEnabled=!soundEnabled;$('sound').setAttribute('aria-pressed',String(soundEnabled));$('sound').title=soundEnabled?'关闭声音':'开启声音';$('sound').querySelector('span').textContent=soundEnabled?'声音开':'声音关';$('sound').querySelector('path').setAttribute('d',soundEnabled?'M11 5 6 9H3v6h3l5 4V5Zm5 3c2 2 2 6 0 8m3-11c4 4 4 10 0 14':'M11 5 6 9H3v6h3l5 4V5Zm5 4 5 6m0-6-5 6');if(soundEnabled){initAudio();audio?.resume();tone(600,.08,.04);}if(['racing','countdown'].includes(engine.state))canvas.focus({preventScroll:true});});
 $('help').addEventListener('click',()=>{engine.pause();keys.clear();$('help-dialog').showModal();});
 $('close-help').addEventListener('click',()=>$('help-dialog').close());$('help-done').addEventListener('click',()=>$('help-dialog').close());
@@ -1426,21 +1881,27 @@ async function toggleFullscreen() {
 $('fullscreen').addEventListener('click', toggleFullscreen);
 $('fullscreen-exit').addEventListener('click', toggleFullscreen);
 const controlKeys=new Set(['KeyW','KeyA','KeyS','KeyD','ShiftLeft','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Enter','Space','Escape','KeyQ','Slash']);
+const player2Keys = new Set(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Enter','Slash']);
+function typingTarget(event) {
+  return event.isComposing || event.keyCode === 229
+    || event.target?.closest?.('input, textarea, select, [contenteditable]');
+}
 function nativeActivation(event) {
   return ['Enter', 'Space'].includes(event.code)
     && event.target?.closest?.('button, a, input, select, textarea, [contenteditable]');
 }
 window.addEventListener('keydown',event=>{
   if(event.metaKey||event.ctrlKey||event.altKey)return;
-  if($('help-dialog').open)return;
+  if($('help-dialog').open || leaderboard.busyDialog || typingTarget(event))return;
   if(nativeActivation(event))return;
   if(controlKeys.has(event.code))event.preventDefault();
+  if(raceMode==='ai' && player2Keys.has(event.code))return;
   if(event.code==='Escape'&&!event.repeat){togglePause();return;}
   if(event.code==='Space'&&!event.repeat){if(engine.state==='menu'||engine.state==='finished')begin();else togglePause();return;}
   if(event.code==='KeyQ'&&!event.repeat&&engine.state==='racing'){rescue(1);return;}if(event.code==='Slash'&&!event.repeat&&engine.state==='racing'){rescue(2);return;}
   if (['racing', 'countdown'].includes(engine.state) && controlKeys.has(event.code)) keys.add(event.code);
 });
-window.addEventListener('keyup',event=>{keys.delete(event.code);if(controlKeys.has(event.code)&&!$('help-dialog').open&&!nativeActivation(event))event.preventDefault();});
+window.addEventListener('keyup',event=>{keys.delete(event.code);if(controlKeys.has(event.code)&&!$('help-dialog').open&&!leaderboard.busyDialog&&!typingTarget(event)&&!nativeActivation(event))event.preventDefault();});
 window.addEventListener('blur',()=>{keys.clear();engine.pause();});
 document.addEventListener('visibilitychange',()=>{if(document.hidden){keys.clear();engine.pause();}});
 function loop(timestamp) {
@@ -1449,7 +1910,13 @@ function loop(timestamp) {
   const now = timestamp / 1000;
   toastTime += engine.state === 'racing' ? dt : 0;
   if (!renderer.available) { keys.clear(); engine.pause(); }
-  engine.step(dt, keys);
+  let frameKeys = keys;
+  if (raceMode === 'ai' && engine.state === 'racing') {
+    frameKeys = new Set([...keys].filter(code => !player2Keys.has(code)));
+    for (const code of ai.update(engine, dt)) if (player2Keys.has(code) && code !== 'Slash') frameKeys.add(code);
+    if (ai.rescues > lastAIRescues) { renderer.resetCameras(engine, 2); lastAIRescues = ai.rescues; }
+  }
+  engine.step(dt, frameKeys);
   updateRaceNotices();
   renderer.render(engine, dt, now);
   drawHUD(now);
@@ -1459,7 +1926,7 @@ function loop(timestamp) {
 }
 resize();requestAnimationFrame(loop);
 
-})(Engine, Rendering);
+})(Engine, Rendering, AI, Online);
 
 </script>
 </body>
