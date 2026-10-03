@@ -1,13 +1,13 @@
-import { BadmintonAI } from './ai.mjs?v=leaderboard-1';
-import { Game, WORLD, RALLY_ACCELERATION } from './engine.mjs?v=leaderboard-1';
-import { locales } from './locales.mjs?v=leaderboard-1';
-import { CHARACTERS, characterPreview, drawCharacterDetails } from './characters.mjs?v=leaderboard-1';
-import { VENUES, venuePreview } from './venues.mjs?v=leaderboard-1';
-import { COURT_METERS } from './court.mjs?v=leaderboard-1';
-import { COURT_VIEW, COURT_OUTLINE, COURT_MARKINGS, projectCourtPoint, projectCourtMarking, courtLineWidth } from './court-view.mjs?v=leaderboard-1';
-import { LEADERBOARD_VERSION, LeaderboardClient, MatchClock } from './leaderboard.mjs?v=leaderboard-1';
-import { LEADERBOARD_API_BASE } from './leaderboard-config.mjs?v=leaderboard-1';
-import { LeaderboardUI } from './leaderboard-ui.mjs?v=leaderboard-1';
+import { BadmintonAI } from './ai.mjs?v=emery-input-1';
+import { Game, WORLD, RALLY_ACCELERATION } from './engine.mjs?v=emery-input-1';
+import { locales } from './locales.mjs?v=emery-input-1';
+import { CHARACTERS, characterPreview, drawCharacterDetails } from './characters.mjs?v=emery-input-1';
+import { VENUES, venuePreview } from './venues.mjs?v=emery-input-1';
+import { COURT_METERS } from './court.mjs?v=emery-input-1';
+import { COURT_VIEW, COURT_OUTLINE, COURT_MARKINGS, projectCourtPoint, projectCourtMarking, courtLineWidth } from './court-view.mjs?v=emery-input-1';
+import { LEADERBOARD_VERSION, LeaderboardClient, MatchClock } from './leaderboard.mjs?v=emery-input-1';
+import { LEADERBOARD_API_BASE } from './leaderboard-config.mjs?v=emery-input-1';
+import { LeaderboardUI } from './leaderboard-ui.mjs?v=emery-input-1';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('game');

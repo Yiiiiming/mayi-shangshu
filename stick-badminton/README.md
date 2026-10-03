@@ -50,6 +50,8 @@ If any serve restriction is selected, choose whether serves should **automatical
 
 **Shared AI leaderboard:** each AI difficulty has its own public top five below the court. Only completed single-player victories qualify. Rank by winning margin, then fewer AI points, then shorter time for identical scores; exact score/time ties retain the earlier record. Timing runs from match start to victory, including pauses and time away from the tab, with no live timer. A qualifying win asks for a nickname, and saving publishes that nickname, score and elapsed time to the shared board. Skipping leaves the win unsubmitted. The service rechecks rank when saving, supports idempotent retries and reports outages without pretending an empty local board is shared. Characters, venue and custom rules remain playable. This is a casual browser-reported board, not server-verified anti-cheat.
 
+**Desktop only:** phones and tablets show a bilingual prompt to open the game on a computer. The mobile entry never loads the game or shared leaderboard. Narrow desktop windows and Windows touchscreen computers remain supported.
+
 ## 中文
 
 支持单人挑战电脑和本地双人对决的街机羽毛球小游戏，也提供触屏按钮。无需账号、插件或下载；画面、动作和音效均由代码生成。
@@ -99,6 +101,8 @@ If any serve restriction is selected, choose whether serves should **automatical
 **计分与墙壁：**11 分制，需净胜 2 分，15 分封顶；每球得分，得分方发下一球。球落在自己半场，对方得分。两侧后墙会反弹来球；靠近地面的反弹会稍微弹高并减速，给接球者留出救球时间，已经落地的球不会再次弹起。球成功越网后撞墙，再回到自己半场时，即使是原击球者，也能再次救球。
 
 **全站 AI 排行榜：**简单、中等、困难各有前 5，显示在球场下方。仅完成单人比赛并战胜 AI 才能入榜。先按净胜分，再按更少失分，相同比分按总用时排名；比分与用时完全相同时保留先上榜者。用时从开始比赛计到获胜，包括暂停和离开页面的时间，比赛中不显示计时器。成绩符合前 5 时询问昵称，确认提交后，昵称、比分与用时对所有访客公开；选择跳过不会上传。提交时会再次核对名次，网络失败可重试且不重复入榜。各角色、场馆与自定义规则仍可正常游玩。此为浏览器上报的休闲榜，并非服务器验算的防作弊比赛。
+
+**电脑端游玩：**手机和平板会显示中英文「请用电脑打开」提示，不加载游戏和排行榜。电脑的小窗口与 Windows 触屏电脑仍可正常进入。
 
 ## Run locally / 本地运行
 

@@ -1,6 +1,6 @@
 /** Deterministic physics for a two-player arcade badminton court. */
-import { CHARACTER_STATS } from './characters.mjs?v=leaderboard-1';
-import { COURT_WORLD } from './court.mjs?v=leaderboard-1';
+import { CHARACTER_STATS } from './characters.mjs?v=emery-input-1';
+import { COURT_WORLD } from './court.mjs?v=emery-input-1';
 export const WORLD = Object.freeze({
   width: 1100, height: 600, floorY: COURT_WORLD.floorY, netX: COURT_WORLD.netX,
   netTop: 315, wallLeft: 28, wallRight: 1072, wallTop: 90,

@@ -7,10 +7,17 @@
   <meta id="page-description" name="description" content="Stick Badminton / 火柴人羽毛球. Choose English or 中文. Play against the computer or share a keyboard with a friend.">
   <title>Stick Badminton / 火柴人羽毛球</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=leaderboard-1">
+  <link rel="stylesheet" href="style.css?v=emery-input-1">
 </head>
 <body>
-  <section id="language-screen" class="language-screen" aria-labelledby="language-title">
+  <section id="device-screen" class="device-screen" aria-labelledby="device-title" hidden>
+    <div class="device-card">
+      <span class="language-brand">STICK BADMINTON / 火柴人羽毛球</span>
+      <h1 id="device-title"><span lang="zh-CN">请用电脑打开</span><span lang="en">Open on a computer</span></h1>
+      <p class="device-copy"><span lang="zh-CN">暂不支持手机和平板。请用电脑浏览器打开这个网址，通过键盘开始比赛。</span><span lang="en">Phones and tablets are not supported yet. Open this page in a computer browser to play with a keyboard.</span></p>
+    </div>
+  </section>
+  <section id="language-screen" class="language-screen" aria-labelledby="language-title" hidden>
     <div class="language-card">
       <span class="language-brand">STICK CLUB / 01</span>
       <div class="language-art" aria-hidden="true">Ⅱ <span>↗</span></div>
@@ -172,6 +179,6 @@
     <p id="live-status" class="sr-only" aria-live="polite"></p>
   </main>
   <noscript><p class="noscript"><span lang="zh-CN">请开启 JavaScript 来玩火柴人羽毛球。</span><br><span lang="en">Please enable JavaScript to play Stick Badminton.</span></p></noscript>
-  <script type="module" src="game.mjs?v=leaderboard-1"></script>
+  <script type="module" src="entry.mjs?v=emery-input-1"></script>
 </body>
 </html>
