@@ -1,10 +1,10 @@
-import { BadmintonAI } from './ai.mjs?v=real-court-1';
-import { Game, WORLD, RALLY_ACCELERATION } from './engine.mjs?v=real-court-1';
-import { locales } from './locales.mjs?v=real-court-1';
-import { CHARACTERS, characterPreview, drawCharacterDetails } from './characters.mjs?v=real-court-1';
-import { VENUES, venuePreview } from './venues.mjs?v=real-court-1';
-import { COURT_METERS } from './court.mjs?v=real-court-1';
-import { COURT_VIEW, COURT_OUTLINE, COURT_MARKINGS, projectCourtPoint, projectCourtMarking, courtLineWidth } from './court-view.mjs?v=real-court-1';
+import { BadmintonAI } from './ai.mjs?v=low-wall-save-1';
+import { Game, WORLD, RALLY_ACCELERATION } from './engine.mjs?v=low-wall-save-1';
+import { locales } from './locales.mjs?v=low-wall-save-1';
+import { CHARACTERS, characterPreview, drawCharacterDetails } from './characters.mjs?v=low-wall-save-1';
+import { VENUES, venuePreview } from './venues.mjs?v=low-wall-save-1';
+import { COURT_METERS } from './court.mjs?v=low-wall-save-1';
+import { COURT_VIEW, COURT_OUTLINE, COURT_MARKINGS, projectCourtPoint, projectCourtMarking, courtLineWidth } from './court-view.mjs?v=low-wall-save-1';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('game');

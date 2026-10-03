@@ -1,6 +1,6 @@
 /** Deterministic physics for a two-player arcade badminton court. */
-import { CHARACTER_STATS } from './characters.mjs?v=real-court-1';
-import { COURT_WORLD } from './court.mjs?v=real-court-1';
+import { CHARACTER_STATS } from './characters.mjs?v=low-wall-save-1';
+import { COURT_WORLD } from './court.mjs?v=low-wall-save-1';
 export const WORLD = Object.freeze({
   width: 1100, height: 600, floorY: COURT_WORLD.floorY, netX: COURT_WORLD.netX,
   netTop: 315, wallLeft: 28, wallRight: 1072, wallTop: 90,
@@ -15,6 +15,54 @@ const PLAYER_GRAVITY = 1800;
 const NAMES = ['蓝方', '红方'];
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const approach = (value, target, amount) => value < target ? Math.min(value + amount, target) : Math.max(value - amount, target);
+
+/** Advance one short ballistic step, resolving the floor and back wall in
+ * time order. Net contact is handled by the caller. Shared with AI forecasts.
+ * Does not mutate its input; wallContact contains the incoming contact state. */
+export function advanceWallFlight({ x, y, vx, vy }, flightDt) {
+  const floor = WORLD.floorY - 4;
+  const floorTime = (height, vertical) => height >= floor ? 0
+    : (-vertical + Math.sqrt(vertical * vertical + 2 * GRAVITY * (floor - height))) / GRAVITY;
+  const result = { x, y, vx, vy, landed: false, wallSide: null, wallContact: null };
+  if (!Number.isFinite(flightDt) || flightDt <= 0) return result;
+  const wallSide = vx < 0 ? 0 : 1;
+  const wallX = wallSide === 0 ? WORLD.wallLeft : WORLD.wallRight;
+  const wallTime = vx === 0 ? Infinity : Math.max(0, (wallX - x) / vx);
+  const landingTime = floorTime(y, vy);
+  const advance = (time) => {
+    result.x += result.vx * time;
+    result.y += result.vy * time + 0.5 * GRAVITY * time * time;
+    result.vy += GRAVITY * time;
+  };
+  // A simultaneous floor/wall contact belongs to the floor: a ball already
+  // on the ground must never be revived by the low-wall assistance.
+  if (landingTime <= flightDt && landingTime <= wallTime + 1e-10) {
+    advance(landingTime);
+    result.y = floor;
+    result.landed = true;
+    return result;
+  }
+  if (wallTime <= flightDt) {
+    advance(wallTime);
+    result.x = wallX;
+    result.wallSide = wallSide;
+    result.wallContact = { side: wallSide, x: wallX, y: result.y, vx: result.vx, vy: result.vy, time: wallTime };
+    // Only the bottom 76 pixels receive help. The continuous easing leaves
+    // middle/high rebounds unchanged and gives low balls a small recoverable
+    // hop instead of retaining all of their downward impact speed.
+    const low = clamp((result.y - (WORLD.floorY - 80)) / 76, 0, 1);
+    const help = 1 - (1 - low) ** 2;
+    result.vx *= -(0.85 - 0.15 * help);
+    result.vy = Math.min(result.vy, result.vy * (1 - help) - 300 * help);
+    const remaining = flightDt - wallTime;
+    const afterBounceFloor = floorTime(result.y, result.vy);
+    advance(Math.min(remaining, afterBounceFloor));
+    if (afterBounceFloor <= remaining) { result.y = floor; result.landed = true; }
+    return result;
+  }
+  advance(flightDt);
+  return result;
+}
 
 export class Game {
   constructor({ target = 11, rules = {}, characters = ['classic', 'classic'] } = {}) {
@@ -184,9 +232,8 @@ export class Game {
     // rally then follows the same spatial arc while players, charge gestures,
     // and contact cooldowns continue to use the real frame duration.
     const flightDt = dt * this.rallySpeed;
-    shuttle.x += shuttle.vx * flightDt;
-    shuttle.y += shuttle.vy * flightDt + 0.5 * GRAVITY * flightDt * flightDt;
-    shuttle.vy += GRAVITY * flightDt;
+    const flight = advanceWallFlight(shuttle, flightDt);
+    Object.assign(shuttle, { x: flight.x, y: flight.y, vx: flight.vx, vy: flight.vy });
 
     const crossedNet = (previousX < WORLD.netX && shuttle.x >= WORLD.netX)
       || (previousX > WORLD.netX && shuttle.x <= WORLD.netX)
@@ -195,6 +242,8 @@ export class Game {
       const fraction = (WORLD.netX - previousX) / (shuttle.x - previousX);
       const crossingY = previousY + (shuttle.y - previousY) * fraction;
       if (crossingY >= WORLD.netTop - 3) {
+        // The net was reached before this step's possible floor contact.
+        flight.landed = false;
         const fromLeft = previousX < WORLD.netX || (previousX === WORLD.netX && shuttle.vx > 0);
         if (crossingY < WORLD.netTop) {
           // A feather clipping the top of the tape loses pace but can tumble
@@ -225,36 +274,21 @@ export class Game {
       this._serveReachedLine = true;
     }
 
-    const hitBackWall = (shuttle.x < WORLD.wallLeft && shuttle.vx < 0)
-      || (shuttle.x > WORLD.wallRight && shuttle.vx > 0);
-    if (hitBackWall && this._serveFlightActive && !this.rules.allowServeWall) {
+    if (flight.wallSide !== null && this._serveFlightActive && !this.rules.allowServeWall) {
+      shuttle.x = flight.wallContact.x;
+      shuttle.y = flight.wallContact.y;
       this._awardPoint(1 - this._serveOrigin, 'serve-wall');
       return;
     }
 
-    // The back walls keep deep shots alive. Reflect the small overshoot as
-    // well as velocity, so fast shots cannot tunnel through a wall.
-    if (shuttle.x < WORLD.wallLeft && shuttle.vx < 0) {
-      shuttle.x = WORLD.wallLeft + (WORLD.wallLeft - shuttle.x);
-      shuttle.vx *= -0.85;
+    if (flight.wallSide !== null) {
       this._wallSinceHit = true;
-      this._emit({ type: 'wall', side: 0 });
-    } else if (shuttle.x > WORLD.wallRight && shuttle.vx > 0) {
-      shuttle.x = WORLD.wallRight - (shuttle.x - WORLD.wallRight);
-      shuttle.vx *= -0.85;
-      this._wallSinceHit = true;
-      this._emit({ type: 'wall', side: 1 });
+      this._emit({ type: 'wall', side: flight.wallSide });
     }
 
-    this._tryHits();
-    this._trailClock += dt;
-    if (this._trailClock >= 1 / 45) {
-      this._trailClock = 0;
-      shuttle.trail.push({ x: shuttle.x, y: shuttle.y });
-      if (shuttle.trail.length > 12) shuttle.trail.shift();
-    }
-
-    if (shuttle.y >= WORLD.floorY - 4) {
+    // Resolve a completed landing before the second contact window. This
+    // prevents a buffered swing from catching a shuttle after floor impact.
+    if (flight.landed || shuttle.y >= WORLD.floorY - 4) {
       shuttle.y = WORLD.floorY - 4;
       const landedOn = shuttle.x < WORLD.netX ? 0 : 1;
       if (this._serveFlightActive && this.rules.requireServiceLine && !this._serveReachedLine
@@ -263,6 +297,15 @@ export class Game {
       } else {
         this._awardPoint(1 - landedOn, this.pointReason || '落地得分');
       }
+      return;
+    }
+
+    this._tryHits();
+    this._trailClock += dt;
+    if (this._trailClock >= 1 / 45) {
+      this._trailClock = 0;
+      shuttle.trail.push({ x: shuttle.x, y: shuttle.y });
+      if (shuttle.trail.length > 12) shuttle.trail.shift();
     }
   }
 
@@ -360,16 +403,18 @@ export class Game {
     for (let side = 0; side < 2; side += 1) {
       const player = this.players[side];
       if (player._attackBuffer <= 0 || player._hitCooldown > 0) continue;
+      // Racket reach does not grant contact in the opponent's half. The
+      // shuttle centre must reach the net plane or this player's own court.
+      if (side === 0 ? this.shuttle.x > WORLD.netX : this.shuttle.x < WORLD.netX) continue;
       if (this.lastHitter === side) {
-        const onOwnSide = side === 0 ? this.shuttle.x < WORLD.netX : this.shuttle.x > WORLD.netX;
+        const onOwnSide = side === 0 ? this.shuttle.x <= WORLD.netX : this.shuttle.x >= WORLD.netX;
         const wallSave = this._wallSinceHit && this._crossedNetSinceHit;
         const combo = this.rules.allowCombo && !this._crossedNetSinceHit;
         if (!onOwnSide || (!wallSave && !combo)) continue;
       }
-      if (side === 0 ? this.shuttle.x > WORLD.netX + 5 : this.shuttle.x < WORLD.netX - 5) continue;
       const dx = (this.shuttle.x - (player.x + player.facing * 25)) / 113;
       const dy = (this.shuttle.y - (player.y - 72)) / 114;
-      if (dx * dx + dy * dy <= 1 && this.shuttle.y < WORLD.floorY - 3) {
+      if (dx * dx + dy * dy <= 1 && this.shuttle.y < WORLD.floorY - 4) {
         this._strike(side, false);
         return;
       }

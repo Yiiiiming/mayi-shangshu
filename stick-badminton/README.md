@@ -28,7 +28,7 @@ The service lines are marked in each half of the court and align with the floor 
 
 If any serve restriction is selected, choose whether serves should **automatically meet the rules**. This is **on by default**. When switched off, aim and charge normally, and an illegal serve costs a point. When on, serving positions stay behind the server’s own service line and the launch speed and arc are adjusted to meet the selected limits. Hold and release controls remain the same. Assistance adjusts only the initial serve; any later consecutive hits must still obey the serve restrictions until the receiver returns the shuttle. Returning to Open hides this option and turns assistance off.
 
-**Repeated hits** are **on by default**. This lets you hit the shuttle again while it remains in your own half and has not yet cleared the net after your previous shot. Normal swing cooldowns still apply. With either setting, a shuttle that has crossed the net and then rebounded off a back wall can still be rescued after it returns to your own half.
+**Repeated hits** are **on by default**. This lets you hit the shuttle again while it remains in your own half and has not yet cleared the net after your previous shot. Normal swing cooldowns still apply. Every shot must contact the shuttle on your own side of the net; reaching across cannot steal an opponent’s shot. With either setting, a shuttle that has crossed the net and then rebounded off a back wall can still be rescued after it returns to your own half.
 
 **Long-rally acceleration** is **on by default** and can be disabled in the fourth rule option. The serve counts as hit 1. On hit 10, a brief message warns that the shuttle will get faster; from hit 11, every successful contact adds 4% of the original speed, up to 1.6×. Each point restores normal speed. Player movement is unchanged, and no speed meter stays on screen. This choice persists through restarts and language changes.
 
@@ -46,7 +46,7 @@ If any serve restriction is selected, choose whether serves should **automatical
 
 **Power shot stock:** each player starts a match with 3 power shots. A successful power contact uses 1; swinging at empty air costs nothing. Every 3 successful rally hits by that player, including normal and power shots, earn 1 more, with no stock limit. Serves do not count. The scoreboard shows each player's remaining stock and progress toward the next charge. At zero stock, E / slash still returns the shuttle as a normal shot. Stock and progress carry across points. When the score first reaches **10–10**, an animated announcement unlocks **unlimited power shots for both players for the rest of the match**. Starting a new match restores 3 each.
 
-**Scoring and walls:** first to 11, win by 2, capped at 15. Every rally scores a point, and its winner serves next. A shuttle landing in your half gives your opponent the point. Both back walls rebound the shuttle. After the shuttle has crossed the net and then rebounded off a wall, even the original hitter can rescue it once it returns to their own half.
+**Scoring and walls:** first to 11, win by 2, capped at 15. Every rally scores a point, and its winner serves next. A shuttle landing in your half gives your opponent the point. Both back walls rebound the shuttle. Low wall rebounds rise slightly and slow down to give the receiver time to recover; a shuttle that has already landed stays dead. After the shuttle has crossed the net and then rebounded off a wall, even the original hitter can rescue it once it returns to their own half.
 
 ## 中文
 
@@ -76,7 +76,7 @@ If any serve restriction is selected, choose whether serves should **automatical
 
 选了任何发球限制后，会出现**是否自动符合规则**的选项，默认**开启**。关闭时仍由自己选择站位和蓄力，违规就扣这一分。开启后，发球站位会限制在自己的发球线后方，出球速度和弧线会自动调整，使发球符合所选要求；按住蓄力、松开发球的操作不变。自动调整只保证最初的发球；接球方回击前，发球方后续连击仍须遵守发球限制，违规也会失分。切回自由发球会隐藏此项并关闭自动调整。
 
-**允许连击**默认**开启**。开启后，自己击球后，如果球仍在自己半场、尚未成功过网，可以再次击球；仍需要等待正常挥拍间隔。不论是否允许连击，球成功越网后撞墙、再回到自己半场时，都可以再次救球。
+**允许连击**默认**开启**。开启后，自己击球后，如果球仍在自己半场、尚未成功过网，可以再次击球；仍需要等待正常挥拍间隔。所有击球都必须等球来到自己半场，不能隔网抢打对方半场的球。不论是否允许连击，球成功越网后撞墙、再回到自己半场时，都可以再次救球。
 
 **长回合加速**默认**开启**，可在规则菜单第 4 项关闭。发球算第 1 拍，第 10 拍时短暂提示球速即将加快；从第 11 拍开始，每次成功击球增加原球速的 4%，最高 1.6 倍。每一分结束后恢复正常，只加快球速，不改变人物移动速度；比赛中不常驻显示速度。重新开局和切换语言会保留此选项。
 
@@ -94,7 +94,7 @@ If any serve restriction is selected, choose whether serves should **automatical
 
 **大力击球次数：**每人开局有 3 次，成功打出大力球消耗 1 次，挥空不扣次数。每人每成功回击 3 下球（普通和大力击球都算，发球不算），增加 1 次，次数没有上限。比分牌显示双方剩余次数和补充进度，次数与进度会保留到下一回合。用完后，按 E / 仍可普通击球。比分第一次到 **10–10** 时，会播放动画提示：**双方在本场剩余时间内都可无限大力击球**。重新开局后恢复为每人 3 次。
 
-**计分与墙壁：**11 分制，需净胜 2 分，15 分封顶；每球得分，得分方发下一球。球落在自己半场，对方得分。两侧后墙会反弹来球；球成功越网后撞墙，再回到自己半场时，即使是原击球者，也能再次救球。
+**计分与墙壁：**11 分制，需净胜 2 分，15 分封顶；每球得分，得分方发下一球。球落在自己半场，对方得分。两侧后墙会反弹来球；靠近地面的反弹会稍微弹高并减速，给接球者留出救球时间，已经落地的球不会再次弹起。球成功越网后撞墙，再回到自己半场时，即使是原击球者，也能再次救球。
 
 ## Run locally / 本地运行
 

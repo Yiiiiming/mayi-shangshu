@@ -1,5 +1,5 @@
-import { WORLD } from './engine.mjs?v=real-court-1';
-import { COURT_WORLD } from './court.mjs?v=real-court-1';
+import { WORLD, advanceWallFlight } from './engine.mjs?v=low-wall-save-1';
+import { COURT_WORLD } from './court.mjs?v=low-wall-save-1';
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const PROFILES = Object.freeze({
@@ -85,7 +85,7 @@ export class BadmintonAI {
 
     const shuttle = game.shuttle;
     const direction = this.side ? -1 : 1;
-    const onOwnSide = this.side ? shuttle.x >= WORLD.netX - 5 : shuttle.x <= WORLD.netX + 5;
+    const onOwnSide = this.side ? shuttle.x >= WORLD.netX : shuttle.x <= WORLD.netX;
     const canHit = game.lastHitter !== this.side || (game._wallSinceHit && game._crossedNetSinceHit)
       || (game.rules.allowCombo && !game._crossedNetSinceHit);
     if (!canHit || player._hitCooldown > 0 || this.swingWait > 0) return input;
@@ -178,9 +178,10 @@ export class BadmintonAI {
         if (miss < best) { fallback = target; best = miss; }
         if (miss === 0 && y > 344) return target;
       }
-      const nextX = x + vx * flightStep;
-      const nextY = y + vy * flightStep + 340 * flightStep * flightStep;
-      const nextVy = vy + 680 * flightStep;
+      // Use the actual wall/floor response, including the small low-wall
+      // recovery arc and collision order, instead of a separate mirror model.
+      const flight = advanceWallFlight({ x, y, vx, vy }, flightStep);
+      const { x: nextX, y: nextY, vy: nextVy } = flight;
       if ((x < WORLD.netX && nextX >= WORLD.netX) || (x > WORLD.netX && nextX <= WORLD.netX)
         || (x === WORLD.netX && nextX !== x)) {
         const crossingY = y + (nextY - y) * (WORLD.netX - x) / (nextX - x);
@@ -202,10 +203,8 @@ export class BadmintonAI {
           continue;
         }
       }
-      x = nextX; y = nextY; vy = nextVy;
-      if (x < WORLD.wallLeft && vx < 0) { x = 2 * WORLD.wallLeft - x; vx *= -0.85; }
-      if (x > WORLD.wallRight && vx > 0) { x = 2 * WORLD.wallRight - x; vx *= -0.85; }
-      if (y >= WORLD.floorY - 4) break;
+      x = nextX; y = nextY; vx = flight.vx; vy = nextVy;
+      if (flight.landed) break;
     }
     return fallback;
   }

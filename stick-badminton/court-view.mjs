@@ -1,4 +1,4 @@
-import { COURT_METERS, COURT_WORLD, courtWorldX } from './court.mjs?v=real-court-1';
+import { COURT_METERS, COURT_WORLD, courtWorldX } from './court.mjs?v=low-wall-save-1';
 
 // Metres stay physical; only the camera foreshortens the court's depth.
 const depthScale = COURT_WORLD.scale * 0.46;

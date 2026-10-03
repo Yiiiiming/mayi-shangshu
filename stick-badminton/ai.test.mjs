@@ -296,3 +296,29 @@ test('rally acceleration does not shorten AI reaction time', () => {
     assert.equal(firstMovement[0], firstMovement[1], `${difficulty}, side ${side}: reaction changed with ball speed`);
   }
 });
+
+test('all AI levels save low wall rebounds through ordinary controls on either side, including fast rallies', () => {
+  let cases = 0;
+  for (const difficulty of DIFFICULTIES) for (const side of [0, 1]) {
+    for (const rally of [1, 25]) for (const y of [450, 480, 492]) for (const powerShot of [false, true]) {
+      const game = new Game(); game.start();
+      game.phase = 'playing'; game.rally = rally; game.lastHitter = 1 - side;
+      // The incoming shuttle is too far behind the receiver to hit before
+      // impact. A save must wait for the wall and use actual AI inputs.
+      Object.assign(game.shuttle, {
+        x: side ? WORLD.wallRight - 1 : WORLD.wallLeft + 1,
+        y, vx: side ? 700 : -700, vy: 300, active: true, powerShot,
+      });
+      const ai = new BadmintonAI({ side, difficulty, seed: 13 });
+      advanceAI(game, [ai], state => state.phase !== 'playing' || state.lastHitter === side, 3);
+      const label = `${difficulty}/${side}/${rally}/${y}/${powerShot}`;
+      const wallIndex = game.events.findIndex(event => event.type === 'wall');
+      const hitIndex = game.events.findIndex(event => ['hit', 'power'].includes(event.type) && event.player === side);
+      assert.ok(wallIndex >= 0 && hitIndex > wallIndex, label);
+      assert.equal(game.lastHitter, side, label);
+      assert.equal(game.phase, 'playing', label);
+      cases++;
+    }
+  }
+  assert.equal(cases, 72);
+});

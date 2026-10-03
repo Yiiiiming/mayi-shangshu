@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Game, WORLD, RALLY_ACCELERATION } from './engine.mjs';
+import { Game, WORLD, RALLY_ACCELERATION, advanceWallFlight } from './engine.mjs';
 import { COURT_METERS, COURT_WORLD, courtWorldX } from './court.mjs';
 
 // Historical physics fixtures explicitly use open, manual serves and no combos.
@@ -1464,5 +1464,178 @@ test('flight acceleration cannot bypass a short-serve or prohibited-wall restric
     assert.equal(game.pointReason, charge === 0 ? 'serve-short' : charge === 1 ? 'serve-wall' : '落地得分');
     assert.equal(game.score[charge === 0.5 ? side : 1 - side], 1);
     assert.equal(game.events.filter((event) => event.type === 'point').length, 1);
+  }
+});
+
+test('shared wall flight keeps middle/high rebound velocities and integrates from the actual contact point', () => {
+  for (const side of [0, 1]) for (const height of [240, 400]) {
+    const state = { x: side ? 1070 : 30, y: height, vx: side ? 700 : -700, vy: 300 };
+    const original = { ...state };
+    const result = advanceWallFlight(state, 1 / 120);
+    assert.deepEqual(state, original, 'the forecast helper must not mutate the live shuttle');
+    assert.equal(result.wallSide, side);
+    assert.equal(result.landed, false);
+    assert.equal(result.vx, -state.vx * 0.85);
+    assert.ok(Math.abs(result.vy - (300 + 680 / 120)) < 1e-8);
+    assert.ok(Math.abs(result.y - (height + 300 / 120 + 340 / (120 * 120))) < 1e-8);
+    const remaining = 1 / 120 - 2 / 700;
+    assert.ok(Math.abs(result.x - ((side ? WORLD.wallRight : WORLD.wallLeft) + result.vx * remaining)) < 1e-8);
+  }
+});
+
+test('low wall assistance increases continuously and is exactly mirrored without removing a power trail', () => {
+  let previousLift = Infinity;
+  let previousHorizontal = Infinity;
+  for (const height of [420, 430, 450, 470, 490]) {
+    const left = advanceWallFlight({ x: 28, y: height, vx: -700, vy: 300 }, 1 / 240);
+    const right = advanceWallFlight({ x: 1072, y: height, vx: 700, vy: 300 }, 1 / 240);
+    assert.ok(left.vy <= previousLift);
+    assert.ok(Math.abs(left.vx) <= previousHorizontal);
+    assert.ok(Math.abs(left.x + right.x - WORLD.width) < 1e-8);
+    assert.equal(left.y, right.y);
+    assert.equal(left.vx, -right.vx);
+    assert.equal(left.vy, right.vy);
+    previousLift = left.vy;
+    previousHorizontal = Math.abs(left.vx);
+  }
+  const near = [419.999, 420, 420.001].map((y) => advanceWallFlight({ x: 1072, y, vx: 700, vy: 300 }, 1 / 240));
+  assert.ok(Math.abs(near[2].vy - near[0].vy) < 0.02);
+  const game = acceleratedFlight(true, { x: 1070, y: 480, vx: 700, vy: 300, powerShot: true });
+  game.update(1 / 120);
+  assert.equal(game.shuttle.powerShot, true);
+});
+
+test('floor-before-wall is final while a genuinely earlier wall contact receives a rebound', () => {
+  for (const side of [0, 1]) {
+    const direction = side ? 1 : -1;
+    const floorFirst = advanceWallFlight({ x: side ? 1070 : 30, y: 495, vx: direction * 700, vy: 600 }, 1 / 120);
+    assert.equal(floorFirst.landed, true);
+    assert.equal(floorFirst.wallSide, null);
+    assert.equal(floorFirst.wallContact, null);
+    assert.equal(floorFirst.y, WORLD.floorY - 4);
+    assert.ok(floorFirst.x > WORLD.wallLeft && floorFirst.x < WORLD.wallRight);
+    const wallFirst = advanceWallFlight({ x: side ? 1071 : 29, y: 494, vx: direction * 700, vy: 200 }, 1 / 120);
+    assert.equal(wallFirst.landed, false);
+    assert.equal(wallFirst.wallSide, side);
+    assert.ok(wallFirst.vy < 0);
+    assert.ok(Math.abs(wallFirst.x - wallFirst.wallContact.x) < 5);
+    assert.ok(Math.abs(wallFirst.y - wallFirst.wallContact.y) < 3, 'bounce must not teleport upward');
+  }
+});
+
+test('forbidden serve walls cannot override an earlier floor point, but true wall-first serves still fault', () => {
+  for (const side of [0, 1]) for (const floorFirst of [false, true]) for (const rally of [1, 25]) {
+    const game = createGame({ rules: { allowServeWall: false } }); game.start(); game.phase = 'playing';
+    game.rally = rally; game.lastHitter = 1 - side;
+    game._serveFlightActive = true; game._serveOrigin = 1 - side;
+    Object.assign(game.shuttle, { x: side ? (floorFirst ? 1070 : 1071) : (floorFirst ? 30 : 29),
+      y: floorFirst ? 495 : 494, vx: side ? 700 : -700, vy: floorFirst ? 600 : 200, active: true });
+    game.update(1 / 60);
+    assert.equal(game.phase, 'point');
+    assert.equal(game.pointReason, floorFirst ? '落地得分' : 'serve-wall');
+    assert.equal(game.score[floorFirst ? 1 - side : side], 1);
+    assert.equal(game.events.filter((event) => event.type === 'wall').length, 0);
+    assert.equal(game.events.filter((event) => event.type === 'point').length, 1);
+  }
+});
+
+test('a shuttle already on the floor cannot be caught by either pre-step or buffered post-step swings', () => {
+  const landed = createGame(); landed.start(); landed.phase = 'playing'; landed.lastHitter = 0;
+  Object.assign(landed.players[1], { x: 850, _attackBuffer: 0.18 });
+  Object.assign(landed.shuttle, { x: 825, y: 496, vx: 0, vy: 0, active: true });
+  landed.update(1 / 120, [{}, { power: true }]);
+  assert.equal(landed.phase, 'point');
+  assert.equal(landed.lastHitter, 0);
+  assert.equal(landed.rally, 0);
+  const crossing = createGame(); crossing.start(); crossing.phase = 'playing'; crossing.lastHitter = 0;
+  Object.assign(crossing.players[1], { x: 1000 });
+  // Just outside racket reach at the beginning, inside it after the landing.
+  Object.assign(crossing.shuttle, { x: 1067, y: 495, vx: -1100, vy: 600, active: true });
+  crossing.update(1 / 120, [{}, { power: true }]);
+  assert.equal(crossing.phase, 'point');
+  assert.equal(crossing.lastHitter, 0);
+  assert.equal(crossing.rally, 0);
+});
+
+test('near-floor wall rebounds leave hundreds of milliseconds at normal and maximum rally speed', () => {
+  for (const side of [0, 1]) for (const rally of [1, 25]) for (const height of [480, 492]) {
+    const game = acceleratedFlight(true, { x: side ? 1070 : 30, y: height, vx: side ? 700 : -700, vy: 300 });
+    game.rally = rally; game.lastHitter = 1 - side;
+    let wallAt = null;
+    let age = 0;
+    while (game.phase === 'playing' && age < 2) {
+      game.update(1 / 240); age += 1 / 240;
+      if (wallAt === null && game.events.some((event) => event.type === 'wall')) wallAt = age;
+    }
+    assert.equal(game.phase, 'point');
+    assert.ok(wallAt !== null);
+    assert.ok(age - wallAt > 0.48 && age - wallAt < 1.05, `${side}, ${rally}, ${height}: ${age - wallAt}`);
+  }
+});
+
+test('normal keyboard movement and a released swing can rescue low ordinary and power wall rebounds', () => {
+  for (const side of [0, 1]) for (const rally of [1, 25]) for (const powerShot of [false, true]) for (const height of [480, 492]) {
+    const game = acceleratedFlight(true, { x: side ? 1070 : 30, y: height, vx: (side ? 1 : -1) * (powerShot ? 1100 : 700), vy: 300, powerShot });
+    game.rally = rally; game.lastHitter = 1 - side;
+    const originalRally = rally;
+    for (let frame = 0; frame < 360 && game.phase === 'playing' && game.lastHitter !== side; frame++) {
+      const inputs = [{}, {}];
+      if (frame >= 29) { // 120 ms human reaction time before any response.
+        const player = game.players[side];
+        const desired = game.shuttle.x - player.facing * 25;
+        const dx = (game.shuttle.x - (player.x + player.facing * 25)) / 113;
+        const dy = (game.shuttle.y - (player.y - 72)) / 114;
+        const inReach = dx * dx + dy * dy < 0.86;
+        inputs[side] = { left: desired < player.x - 20, right: desired > player.x + 20,
+          hit: !(player.hitCharging && inReach) };
+      }
+      game.update(1 / 240, inputs);
+    }
+    assert.ok(game.events.some((event) => event.type === 'wall' && event.side === side));
+    assert.equal(game.lastHitter, side, `rescue failed: side=${side}, rally=${rally}, power=${powerShot}, y=${height}`);
+    assert.equal(game.rally, originalRally + 1);
+    assert.ok(game.events.some((event) => event.type === 'hit' && event.player === side));
+    assert.equal(game.phase, 'playing');
+  }
+});
+
+test('normal and power swings never contact an opponent-side shuttle, including optional combos', () => {
+  for (const side of [0, 1]) for (const shot of ['hit', 'power']) for (const allowCombo of [false, true])
+    for (const ownPreviousHit of [false, true]) for (const height of [300, 420]) for (const offset of [-0.01, 0, 0.01, 4.9]) {
+      const game = createGame({ rules: { allowCombo } }); game.start(); game.phase = 'playing';
+      const direction = side ? -1 : 1;
+      game.rally = 4; game.lastHitter = ownPreviousHit ? side : 1 - side;
+      game._crossedNetSinceHit = false;
+      Object.assign(game.players[side], { x: WORLD.netX - direction * 37, y: height === 300 ? 400 : 500, vx: 0, vy: 0 });
+      Object.assign(game.shuttle, { x: WORLD.netX + direction * offset, y: height, vx: 0, vy: 0, active: true });
+      const input = [{}, {}]; input[side] = { [shot]: true };
+      game.update(1 / 240, input);
+      if (shot === 'hit') game.update(1 / 240);
+      const allowed = offset <= 0 && (!ownPreviousHit || allowCombo);
+      const context = JSON.stringify({ side, shot, allowCombo, ownPreviousHit, height, offset });
+      assert.equal(game.rally, allowed ? 5 : 4, context);
+      assert.equal(game.players[side].powerCharges, allowed && shot === 'power' ? 2 : 3, context);
+      assert.equal(game.players[side].powerProgress, allowed ? 1 : 0, context);
+      assert.equal(game.events.filter((event) => event.type === 'hit' || event.type === 'power').length, allowed ? 1 : 0, context);
+      if (allowed) assert.equal(game.lastHitter, side, context);
+      else assert.equal(game.lastHitter, ownPreviousHit ? side : 1 - side, context);
+    }
+});
+
+test('a buffered swing waits for an incoming shuttle to cross the net plane instead of stealing it early', () => {
+  for (const side of [0, 1]) for (const shot of ['hit', 'power']) {
+    const game = createGame(); game.start(); game.phase = 'playing'; game.lastHitter = 1 - side;
+    const direction = side ? -1 : 1;
+    Object.assign(game.players[side], { x: WORLD.netX - direction * 37, y: 400, vx: 0, vy: 0 });
+    Object.assign(game.shuttle, { x: WORLD.netX + direction * 4, y: 300, vx: -direction * 120, vy: 0, active: true });
+    const input = [{}, {}]; input[side] = { [shot]: true };
+    game.update(1 / 240, input);
+    if (shot === 'hit') game.update(1 / 240);
+    assert.equal(game.rally, 0);
+    assert.equal(game.players[side].powerCharges, 3);
+    for (let frame = 0; frame < 20 && game.lastHitter !== side; frame++) game.update(1 / 240);
+    assert.equal(game.lastHitter, side);
+    assert.equal(game.rally, 1);
+    assert.equal(game.players[side].powerCharges, shot === 'power' ? 2 : 3);
   }
 });
