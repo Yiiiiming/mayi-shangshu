@@ -5,10 +5,11 @@ import { readFile } from 'node:fs/promises';
 // Deterministic module-level integration: real game/engine with minimal DOM and
 // an explicitly advanced frame clock. This does not launch/control a browser.
 let instance = 0;
-async function setup({ language = 'zh', mode = 'local', difficulty = 'medium', confirmMode = true, start = true, confirmRules = true, confirmCharacters = true, legacyRules = true, storedLanguage = null } = {}) {
+async function setup({ language = 'zh', mode = 'local', difficulty = 'medium', confirmMode = true, start = true, confirmRules = true, confirmCharacters = true, legacyRules = true, storedLanguage = null, leaderboardResponse } = {}) {
   const elements = new Map();
   let frameCallback;
   let now = 100;
+  const requests = [];
   class Surface {
     listeners = new Map();
     addEventListener(type, listener) {
@@ -39,7 +40,7 @@ async function setup({ language = 'zh', mode = 'local', difficulty = 'medium', c
     classes = new Set();
     classList = { add: (c) => this.classes.add(c), remove: (c) => this.classes.delete(c) };
     setAttribute(k, v) { this.attributes.set(k, v); }
-    matches() { return false; }
+    matches(selector) { return ['input', 'textarea', 'select'].includes(this.tagName) && selector.includes(this.tagName); }
     querySelector(selector) {
       if (!this.children.has(selector)) this.children.set(selector, new Element());
       return this.children.get(selector);
@@ -74,6 +75,7 @@ async function setup({ language = 'zh', mode = 'local', difficulty = 'medium', c
       ? touchButtons.find((button) => button.dataset.player === attributes['data-player'] && button.dataset.action === attributes['data-action'])
       : attributes.id ? get(attributes.id) : new Element();
     if (!node) continue;
+    node.tagName = match[1].toLowerCase();
     for (const [key, value] of Object.entries(attributes)) {
       node.setAttribute(key, value);
       if (key.startsWith('data-')) node.dataset[key.slice(5).replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())] = value;
@@ -99,6 +101,14 @@ async function setup({ language = 'zh', mode = 'local', difficulty = 'medium', c
   Object.assign(win, { devicePixelRatio: 1, matchMedia: () => ({ matches: false }) });
   Object.assign(globalThis, { window: win, document: doc, HTMLElement: Element, HTMLButtonElement: Button,
     localStorage: { getItem: (key) => key.includes('sound') ? 'off' : storedLanguage, setItem() {} }, requestAnimationFrame: (callback) => { frameCallback = callback; } });
+  Object.defineProperty(globalThis, 'performance', { configurable: true, value: { now: () => now } });
+  globalThis.fetch = async (url, options) => {
+    const request = { url, method: options.method, body: options.body ? JSON.parse(options.body) : null };
+    requests.push(request);
+    const response = leaderboardResponse ? await leaderboardResponse(request)
+      : { entries: [], ...(url.includes('/api/qualify') ? { rank: null } : {}) };
+    return { status: response.status ?? 200, json: async () => response.data ?? response };
+  };
   // Capture this module's real engine only inside the test harness. Contact
   // fixtures can exercise UI updates without adding production state mutators.
   const gameSource = await readFile(new URL('./game.mjs', import.meta.url), 'utf8');
@@ -107,7 +117,12 @@ async function setup({ language = 'zh', mode = 'local', difficulty = 'medium', c
   const originalReset = Game.prototype.reset;
   let engine;
   Game.prototype.reset = function (...args) { engine = this; return originalReset.apply(this, args); };
-  try { await import(`./game.mjs?charge-ui=${instance++}`); }
+  // Use the real game source with an isolated test endpoint. All dependent
+  // modules stay real; no test request can reach the deployed shared board.
+  const testSource = gameSource
+    .replace(/import\s*\{\s*LEADERBOARD_API_BASE\s*\}\s*from\s*['"][^'"]+['"];?/, "const LEADERBOARD_API_BASE = 'https://leaderboard.test';")
+    .replace(/from (['"])(\.[^'"]+)\1/g, (_, quote, path) => `from '${new URL(path, import.meta.url).href}'`);
+  try { await import(`data:text/javascript;base64,${Buffer.from(`${testSource}\n// UI instance ${instance++}`).toString('base64')}`); }
   finally { Game.prototype.reset = originalReset; }
   const tick = (count = 1) => { for (let i = 0; i < count; i++) { now += 1000 / 60; frameCallback(now); } };
   const key = (type, code, extra = {}) => win.dispatch(type, { code, target: get('game'), ...extra });
@@ -125,7 +140,9 @@ async function setup({ language = 'zh', mode = 'local', difficulty = 'medium', c
   tick(36);
   const text = (element) => [element.textContent, element.innerHTML, ...element.attributes.values(),
     ...element.appended.map(text), ...[...element.children.values()].map(text)].join(' ');
-  return { get, key, pointer, tick, doc, win, elements, text, touchButtons, staticNodes, engine, state: () => win.badminton.snapshot() };
+  const flush = async () => { for (let i = 0; i < 20; i++) await Promise.resolve(); };
+  return { get, key, pointer, tick, doc, win, elements, text, touchButtons, staticNodes, engine, requests, flush,
+    wall: (milliseconds) => { now += milliseconds; }, now: () => now, state: () => win.badminton.snapshot() };
 }
 
 test('full serve charge waits for release and meter reaches 100%', async () => {
@@ -1164,4 +1181,180 @@ test('Classic is the default venue and five scenic choices are complete in both 
       assert.equal(h.get(`venue-${venue.id}`).attributes.get('aria-label'), `${venue.name[language]} · ${venue.description[language]}`);
     }
   }
+});
+
+function leaderboardEntry(difficulty = 'medium', extra = {}) {
+  return { version: 'ai-v1', id: 'existing-record', difficulty, name: 'Rally fan', playerScore: 11, aiScore: 4,
+    timeMs: 125000, createdAt: '2026-10-03T12:00:00.000Z', ...extra };
+}
+function completeTrackedMatch(h, winner = 0) {
+  h.engine.phase = 'playing'; h.engine.score = winner === 0 ? [10, 4] : [4, 10];
+  h.engine._awardPoint(winner, '落地得分'); h.tick();
+}
+const apiCalls = (h, endpoint) => h.requests.filter(request => request.url.includes(`/api/${endpoint}`));
+
+test('shared leaderboard loads each difficulty, localizes states, and treats public names as text', async () => {
+  for (const language of ['zh', 'en']) {
+    const h = await setup({ language, start: false, leaderboardResponse: ({ url }) => {
+      const difficulty = new URL(url).searchParams.get('difficulty');
+      return { entries: difficulty === 'easy' ? [] : [leaderboardEntry(difficulty, { name: '<img src=x>' })] };
+    } });
+    await h.flush();
+    assert.equal(h.get('leaderboard-entries').appended.length, 1);
+    const name = h.get('leaderboard-entries').appended[0].appended[1];
+    assert.equal(name.textContent, '<img src=x>'); assert.equal(name.innerHTML, '');
+    assert.ok(h.get('leaderboard-entries').appended[0].attributes.get('aria-label').includes('<img src=x>'));
+    click(h, 'leaderboard-easy'); await h.flush();
+    assert.equal(h.get('leaderboard-easy').attributes.get('aria-pressed'), 'true');
+    assert.equal(h.get('leaderboard-entries').appended.length, 0);
+    assert.match(h.get('leaderboard-status').textContent, language === 'en' ? /No scores yet/ : /还没有成绩/);
+    click(h, 'leaderboard-hard'); await h.flush();
+    assert.match(h.get('leaderboard-caption').textContent, language === 'en' ? /Hard/ : /困难/);
+    assert.equal(apiCalls(h, 'leaderboard').length, 3);
+    assert.equal(apiCalls(h, 'records').length, 0);
+  }
+});
+
+test('only a completed single-player win asks the shared board for qualification', async () => {
+  for (const [mode, winner] of [['local', 0], ['single', 1], ['single', 0]]) {
+    const h = await setup({ mode, leaderboardResponse: ({ url }) => url.includes('/qualify') ? { entries: [], rank: null } : { entries: [] } });
+    await h.flush(); h.wall(7000); completeTrackedMatch(h, winner); await h.flush();
+    assert.equal(apiCalls(h, 'qualify').length, mode === 'single' && winner === 0 ? 1 : 0);
+    assert.equal(h.get('record-form').hidden, true, 'A non-qualifying score must never ask for a nickname');
+    assert.equal(apiCalls(h, 'records').length, 0);
+  }
+  const partial = await setup({ mode: 'single' }); partial.wall(9000); click(partial, 'restart'); await partial.flush();
+  assert.equal(apiCalls(partial, 'qualify').length, 0);
+  assert.equal(partial.get('record-panel').hidden, true);
+});
+
+test('match time includes pause and hidden time, freezes at victory, and requires explicit nickname submission', async () => {
+  const h = await setup({ language: 'en', mode: 'single', difficulty: 'hard', start: false, leaderboardResponse: ({ url, body }) => {
+    if (url.includes('/qualify')) return { entries: [], rank: 1 };
+    if (url.includes('/records')) return { saved: true, rank: 1, entries: [{ ...body, createdAt: '2026-10-03T13:00:00.000Z' }] };
+    return { entries: [] };
+  } });
+  await h.flush();
+  const startedAt = h.now(); h.get('start').dispatch('click'); h.tick(60);
+  click(h, 'pause'); h.wall(20000);
+  h.doc.hidden = true; h.doc.dispatch('visibilitychange'); h.wall(35000);
+  h.doc.hidden = false; h.doc.dispatch('visibilitychange');
+  h.get('start').dispatch('click'); h.tick(60); completeTrackedMatch(h); await h.flush();
+  const result = apiCalls(h, 'qualify')[0].body;
+  assert.equal(result.timeMs, Math.round(h.now() - startedAt));
+  assert.ok(result.timeMs > 56000);
+  assert.deepEqual(result.rules, h.engine.rules); assert.deepEqual(result.characters, h.state().selectedCharacters);
+  assert.equal(result.difficulty, 'hard'); assert.equal(result.venue, h.state().selectedVenue);
+  assert.equal(h.get('record-form').hidden, false); assert.equal(h.doc.activeElement, h.get('record-name'));
+  assert.match(h.get('record-summary').textContent, /Hard/);
+  assert.equal(apiCalls(h, 'records').length, 0);
+  const summary = h.get('record-summary').textContent;
+  h.wall(30000); h.tick(10);
+  assert.equal(h.get('record-summary').textContent, summary, 'Entering a name must not keep the completed clock running');
+  h.get('record-name').value = '  Ace  ';
+  h.get('record-form').dispatch('submit'); h.get('record-form').dispatch('submit'); await h.flush();
+  assert.equal(apiCalls(h, 'records').length, 1);
+  assert.equal(apiCalls(h, 'records')[0].body.timeMs, result.timeMs);
+  assert.equal(apiCalls(h, 'records')[0].body.id, result.id);
+  assert.equal(apiCalls(h, 'records')[0].body.name, 'Ace');
+  assert.match(h.get('record-status').textContent, /Submitted! Currently ranked #1/);
+  assert.equal(h.get('record-form').hidden, true);
+});
+
+test('nickname input keeps game keys, Enter, spaces and IME separate from the match controls', async () => {
+  const h = await setup({ mode: 'single', leaderboardResponse: ({ url }) => url.includes('/qualify') ? { entries: [], rank: 2 } : { entries: [] } });
+  h.wall(6000); completeTrackedMatch(h); await h.flush();
+  const before = h.state();
+  for (const code of ['KeyS', 'KeyF', 'KeyE', 'KeyP', 'KeyM', 'ArrowLeft', 'ArrowDown', 'Space', 'Enter']) {
+    for (const type of ['keydown', 'keyup']) {
+      const event = h.win.dispatch(type, { code, target: h.get('record-name'), isComposing: code === 'KeyS' });
+      assert.equal(event.defaultPrevented, false, `${type}: ${code}`);
+    }
+  }
+  assert.deepEqual(h.state(), before);
+  h.get('record-name').value = '   '; h.get('record-form').dispatch('submit'); await h.flush();
+  assert.equal(h.get('record-name').attributes.get('aria-invalid'), 'true');
+  assert.equal(apiCalls(h, 'records').length, 0);
+  h.get('record-name').value = '阿羽'; h.get('record-name').dispatch('input');
+  click(h, 'lang-switch'); click(h, 'choose-en'); await h.flush();
+  assert.equal(h.get('record-name').value, '阿羽');
+  assert.match(h.get('record-status').textContent, /currently ranks #2/);
+  assert.equal(apiCalls(h, 'qualify').length, 1, 'Language changes do not finish the match twice');
+  click(h, 'record-skip'); h.engine.events.push({ type: 'win', player: 0 }); h.tick(); await h.flush();
+  assert.equal(h.get('record-panel').hidden, true);
+  assert.equal(apiCalls(h, 'qualify').length, 1); assert.equal(apiCalls(h, 'records').length, 0);
+});
+
+test('qualification and submission failures retry one frozen record without losing the nickname', async () => {
+  let checks = 0, submissions = 0;
+  const h = await setup({ mode: 'single', leaderboardResponse: ({ url, body }) => {
+    if (url.includes('/qualify')) { if (++checks === 1) throw new Error('offline'); return { rank: 1, entries: [] }; }
+    if (url.includes('/records')) { if (++submissions === 1) throw new Error('lost response'); return { saved: true, rank: 1, entries: [{ ...body, createdAt: '2026-10-03T13:00:00.000Z' }] }; }
+    return { entries: [] };
+  } });
+  h.wall(6000); completeTrackedMatch(h); await h.flush();
+  assert.equal(h.get('record-form').hidden, true); assert.equal(h.get('record-retry').hidden, false);
+  click(h, 'record-retry'); await h.flush();
+  assert.deepEqual(apiCalls(h, 'qualify')[0].body, apiCalls(h, 'qualify')[1].body);
+  h.get('record-name').value = 'Retry bird'; h.get('record-form').dispatch('submit'); await h.flush();
+  assert.equal(h.get('record-name').value, 'Retry bird'); assert.equal(h.get('record-name').readOnly, true);
+  assert.equal(h.get('record-retry').hidden, false);
+  h.wall(9000); click(h, 'record-retry'); await h.flush();
+  assert.deepEqual(apiCalls(h, 'records')[0].body, apiCalls(h, 'records')[1].body);
+  assert.match(h.get('record-status').textContent, /提交成功/);
+});
+
+test('a newly changed ranking is explained without submitting the score a second time', async () => {
+  const h = await setup({ language: 'en', mode: 'single', leaderboardResponse: ({ url }) => {
+    if (url.includes('/qualify')) return { rank: 5, entries: [] };
+    if (url.includes('/records')) return { status: 409, data: { error: 'rank_changed', entries: [leaderboardEntry()] } };
+    return { entries: [] };
+  } });
+  h.wall(6000); completeTrackedMatch(h); await h.flush();
+  h.get('record-name').value = 'Fast bird'; h.get('record-form').dispatch('submit'); await h.flush();
+  assert.match(h.get('record-status').textContent, /now outside the top five/);
+  assert.equal(h.get('record-form').hidden, true); assert.equal(h.get('record-retry').hidden, true);
+  assert.equal(apiCalls(h, 'records').length, 1);
+  assert.equal(h.get('leaderboard-entries').appended.length, 1);
+});
+
+test('new games invalidate old qualification and submission responses', async () => {
+  for (const pending of ['qualify', 'records']) {
+    let resolve;
+    const h = await setup({ mode: 'single', leaderboardResponse: ({ url, body }) => {
+      if (url.includes(`/api/${pending}`)) return new Promise(done => { resolve = () => done(pending === 'qualify' ? { rank: 1, entries: [] } : { saved: true, rank: 1, entries: [{ ...body, createdAt: '2026-10-03T13:00:00.000Z' }] }); });
+      if (url.includes('/qualify')) return { rank: 1, entries: [] };
+      return { entries: [] };
+    } });
+    h.wall(6000); completeTrackedMatch(h); await h.flush();
+    if (pending === 'records') { h.get('record-name').value = 'Old match'; h.get('record-form').dispatch('submit'); }
+    assert.equal(typeof resolve, 'function');
+    click(h, 'restart'); click(h, 'start');
+    resolve(); await h.flush();
+    assert.equal(h.get('record-panel').hidden, true); assert.equal(h.get('record-form').hidden, true);
+    assert.equal(h.state().phase, 'serve');
+    assert.equal(h.get('leaderboard-entries').appended.length, 0, 'Old submission UI must not overwrite the new match board');
+  }
+});
+
+test('out-of-order board reads and old qualification data cannot replace newer entries', async () => {
+  let releaseEasy, releaseQualification, refreshed = false;
+  const h = await setup({ mode: 'single', leaderboardResponse: ({ url }) => {
+    if (url.includes('/qualify')) return new Promise(resolve => { releaseQualification = () => resolve({ rank: 3, entries: [leaderboardEntry('medium', { name: 'Old read' })] }); });
+    const level = new URL(url).searchParams.get('difficulty');
+    if (level === 'easy') return new Promise(resolve => { releaseEasy = () => resolve({ entries: [leaderboardEntry('easy', { name: 'Stale easy' })] }); });
+    return { entries: [leaderboardEntry(level, { name: refreshed ? 'New read' : 'Initial read' })] };
+  } });
+  await h.flush(); click(h, 'leaderboard-easy'); click(h, 'leaderboard-hard'); await h.flush();
+  releaseEasy(); await h.flush();
+  assert.equal(h.get('leaderboard-hard').attributes.get('aria-pressed'), 'true');
+  assert.match(h.get('leaderboard-caption').textContent, /困难/);
+  assert.equal(h.get('leaderboard-entries').appended[0].appended[1].textContent, 'Initial read');
+  h.wall(6000); completeTrackedMatch(h); await h.flush();
+  refreshed = true; click(h, 'leaderboard-refresh'); await h.flush();
+  releaseQualification(); await h.flush();
+  assert.equal(h.get('leaderboard-entries').appended[0].appended[1].textContent, 'New read');
+  assert.match(h.get('record-status').textContent, /第 3 名/);
+  click(h, 'leaderboard-hard'); await h.flush();
+  assert.match(h.get('record-summary').textContent, /中等/, 'Pending result identifies its own difficulty even on another tab');
 });

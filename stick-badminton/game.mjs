@@ -1,10 +1,13 @@
-import { BadmintonAI } from './ai.mjs?v=low-wall-save-1';
-import { Game, WORLD, RALLY_ACCELERATION } from './engine.mjs?v=low-wall-save-1';
-import { locales } from './locales.mjs?v=low-wall-save-1';
-import { CHARACTERS, characterPreview, drawCharacterDetails } from './characters.mjs?v=low-wall-save-1';
-import { VENUES, venuePreview } from './venues.mjs?v=low-wall-save-1';
-import { COURT_METERS } from './court.mjs?v=low-wall-save-1';
-import { COURT_VIEW, COURT_OUTLINE, COURT_MARKINGS, projectCourtPoint, projectCourtMarking, courtLineWidth } from './court-view.mjs?v=low-wall-save-1';
+import { BadmintonAI } from './ai.mjs?v=leaderboard-1';
+import { Game, WORLD, RALLY_ACCELERATION } from './engine.mjs?v=leaderboard-1';
+import { locales } from './locales.mjs?v=leaderboard-1';
+import { CHARACTERS, characterPreview, drawCharacterDetails } from './characters.mjs?v=leaderboard-1';
+import { VENUES, venuePreview } from './venues.mjs?v=leaderboard-1';
+import { COURT_METERS } from './court.mjs?v=leaderboard-1';
+import { COURT_VIEW, COURT_OUTLINE, COURT_MARKINGS, projectCourtPoint, projectCourtMarking, courtLineWidth } from './court-view.mjs?v=leaderboard-1';
+import { LEADERBOARD_VERSION, LeaderboardClient, MatchClock } from './leaderboard.mjs?v=leaderboard-1';
+import { LEADERBOARD_API_BASE } from './leaderboard-config.mjs?v=leaderboard-1';
+import { LeaderboardUI } from './leaderboard-ui.mjs?v=leaderboard-1';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('game');
@@ -53,6 +56,40 @@ let transient = '';
 let transientUntil = 0;
 let deuceUntil = 0;
 let focusAfterOverlay = false;
+const matchClock = new MatchClock();
+let currentMatch = null;
+let boardMatchDifficulty = null;
+const leaderboard = new LeaderboardUI({
+  document, client: new LeaderboardClient({ baseUrl: LEADERBOARD_API_BASE }), copy,
+  onPrompt: () => {
+    clearInputs();
+    const focus = () => {
+      if (!canPlay() || leaderboard.resultState !== 'eligible') return;
+      $('record-panel').scrollIntoView?.({ block: 'center', behavior: 'auto' });
+      $('record-name').focus({ preventScroll: true });
+    };
+    if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().then(focus).catch(focus);
+    else focus();
+  },
+});
+
+function resetMatchTracking() {
+  currentMatch = null; matchClock.reset(); leaderboard.resetMatch();
+}
+function beginMatchTracking() {
+  resetMatchTracking(); matchClock.start();
+  const id = globalThis.crypto?.randomUUID?.() || `match-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  currentMatch = { id, version: LEADERBOARD_VERSION, mode: selectedMode, difficulty: selectedDifficulty,
+    rules: { ...game.rules }, characters: [...selectedCharacters], venue: selectedVenue, finished: false };
+}
+function finishMatchTracking() {
+  if (!currentMatch || currentMatch.finished) return;
+  currentMatch.finished = true;
+  const timeMs = matchClock.finish();
+  if (currentMatch.mode !== 'single' || game.winner !== 0 || timeMs === null) return;
+  const { finished, ...match } = currentMatch;
+  leaderboard.finish({ ...match, playerScore: game.score[0], aiScore: game.score[1], timeMs });
+}
 
 try { soundEnabled = localStorage.getItem('stick-badminton-sound') !== 'off'; } catch { /* Storage is optional. */ }
 
@@ -101,6 +138,7 @@ function applyLanguage() {
   $('power-label').textContent = copy.powerIdle;
   $('rule-rally-detail').textContent = copy.ruleRallyOnDetail(RALLY_ACCELERATION);
   updateSoundLabel();
+  leaderboard.setLanguage(copy);
 }
 function chooseLanguage(value) {
   if (!locales[value]) return;
@@ -145,6 +183,7 @@ $('mode-confirm').addEventListener('click', () => {
   if (!languageSelected || !modeOpen) return;
   selectedMode = draftMode; selectedDifficulty = draftDifficulty;
   ai = new BadmintonAI({ side: 1, difficulty: selectedDifficulty });
+  resetMatchTracking();
   game.reset(); paused = false; clearInputs(); particles = []; transient = ''; deuceUntil = 0;
   modeConfirmed = true; modeOpen = false; rulesConfirmed = false; rulesOpen = true;
   charactersConfirmed = false; charactersOpen = false; draftRules = { ...game.rules };
@@ -205,6 +244,7 @@ for (const enabled of [false, true]) {
 $('rules-confirm').addEventListener('click', () => {
   if (!languageSelected || !modeConfirmed || modeOpen || !rulesOpen) return;
   game.setRules(draftRules);
+  resetMatchTracking();
   game.reset(); paused = false; clearInputs(); particles = []; transient = ''; deuceUntil = 0;
   rulesConfirmed = true; rulesOpen = false; charactersConfirmed = false; charactersOpen = true;
   draftCharacters = [...selectedCharacters]; draftVenue = selectedVenue; lastUI = ''; lastCharactersUI = '';
@@ -253,6 +293,7 @@ for (const venue of VENUES) {
 $('characters-confirm').addEventListener('click', () => {
   if (!languageSelected || !modeConfirmed || modeOpen || !rulesConfirmed || !charactersOpen || rulesOpen) return;
   selectedCharacters = [...draftCharacters]; selectedVenue = validVenue(draftVenue); game.setCharacters(selectedCharacters); charactersConfirmed = true; charactersOpen = false;
+  resetMatchTracking();
   game.reset(); paused = false; clearInputs(); particles = []; transient = ''; deuceUntil = 0; lastUI = '';
   syncUI(); $('start').focus({ preventScroll: true });
 });
@@ -288,7 +329,7 @@ function start() {
   if (!canPlay()) return;
   clearInputs();
   if (paused) paused = false;
-  else { game.start(); particles = []; transient = ''; deuceUntil = 0; }
+  else { game.start(); beginMatchTracking(); particles = []; transient = ''; deuceUntil = 0; }
   sound('serve');
   focusAfterOverlay = true;
   syncUI();
@@ -302,7 +343,7 @@ function togglePause() {
   if (!paused) canvas.focus({ preventScroll: true });
   else $('start').focus({ preventScroll: true });
 }
-function restart() { if (!canPlay()) return; paused = false; game.reset(); clearInputs(); particles = []; transient = ''; deuceUntil = 0; syncUI(); $('start').focus({ preventScroll: true }); }
+function restart() { if (!canPlay()) return; resetMatchTracking(); paused = false; game.reset(); clearInputs(); particles = []; transient = ''; deuceUntil = 0; syncUI(); $('start').focus({ preventScroll: true }); }
 
 $('start').addEventListener('click', start);
 $('restart').addEventListener('click', restart);
@@ -337,6 +378,7 @@ window.addEventListener('keydown', (event) => {
 });
 window.addEventListener('keyup', (event) => {
   keys.delete(event.code);
+  if (event.target instanceof HTMLElement && event.target.matches('input, textarea, select, [contenteditable="true"]')) return;
   if (event.code === 'Space' && event.target instanceof HTMLButtonElement) return;
   if (canPlay() && controlled.has(event.code) && !(event.ctrlKey || event.metaKey || event.altKey)) event.preventDefault();
 });
@@ -381,6 +423,7 @@ function inputs(dt) {
 }
 
 function syncUI() {
+  leaderboard.setVisible(canPlay());
   $('language-screen').hidden = languageSelected;
   $('mode-screen').hidden = !languageSelected || !modeOpen;
   if (languageSelected && modeOpen) syncModeChoices();
@@ -395,6 +438,9 @@ function syncUI() {
     $('serve-power').hidden = true;
     $('deuce-banner').hidden = true;
     return;
+  }
+  if (boardMatchDifficulty !== selectedDifficulty) {
+    boardMatchDifficulty = selectedDifficulty; leaderboard.enter(selectedDifficulty);
   }
   const ruleMode = serveRuleKey(game.rules);
   const restricted = ruleMode !== 'open';
@@ -904,6 +950,7 @@ function events() {
       $('live-status').textContent = copy.pointLive(names[event.player], game.score, names[game.server]);
     }
     if (event.type === 'win') {
+      finishMatchTracking();
       emitParticles(400, 180, colors[event.player], 35); emitParticles(700, 180, '#f9dc55', 35);
       $('live-status').textContent = copy.winLive(names[event.player], game.score);
     }

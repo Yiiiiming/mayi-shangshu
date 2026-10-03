@@ -7,7 +7,7 @@
   <meta id="page-description" name="description" content="Stick Badminton / 火柴人羽毛球. Choose English or 中文. Play against the computer or share a keyboard with a friend.">
   <title>Stick Badminton / 火柴人羽毛球</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=low-wall-save-1">
+  <link rel="stylesheet" href="style.css?v=leaderboard-1">
 </head>
 <body>
   <section id="language-screen" class="language-screen" aria-labelledby="language-title">
@@ -136,6 +136,27 @@
       </div>
       <div class="court-bottom"><span data-i18n="courtMotto">好球！打出精彩回合。</span><span id="court-status">等待两位选手入场</span></div>
     </section>
+    <section id="leaderboard" class="leaderboard" aria-labelledby="leaderboard-title">
+      <div class="leaderboard-heading"><div><span class="card-label" data-i18n="leaderboardEyebrow">全站共享 · 每档前五</span><h2 id="leaderboard-title" data-i18n="leaderboardTitle">单人挑战榜</h2></div><button id="leaderboard-refresh" type="button" class="tool" data-i18n="leaderboardRefresh">刷新榜单</button></div>
+      <p class="leaderboard-intro" data-i18n="leaderboardIntro">完整击败电脑即可挑战榜单。先比净胜分，再比电脑得分，同比分用时更短者在前。</p>
+      <div class="leaderboard-tabs" role="group" data-i18n-aria="leaderboardDifficulty" aria-label="排行榜难度">
+        <button id="leaderboard-easy" type="button" aria-pressed="false" data-i18n="difficultyEasy">简单</button><button id="leaderboard-medium" type="button" aria-pressed="true" data-i18n="difficultyMedium">中等</button><button id="leaderboard-hard" type="button" aria-pressed="false" data-i18n="difficultyHard">困难</button>
+      </div>
+      <section id="record-panel" class="record-panel" aria-labelledby="record-title" hidden>
+        <h3 id="record-title" data-i18n="recordTitle">本场成绩</h3><p id="record-summary" class="record-summary"></p><p id="record-status" class="record-status" role="status" aria-live="polite"></p>
+        <form id="record-form" hidden>
+          <label for="record-name" data-i18n="recordName">上榜昵称</label>
+          <div class="record-name-row"><input id="record-name" name="nickname" type="text" autocomplete="nickname" maxlength="40" aria-describedby="record-name-help record-name-error"><button id="record-submit" class="primary" type="submit" data-i18n="recordSubmit">提交到共享榜单</button></div>
+          <p id="record-name-help" class="record-help" data-i18n="recordNameHelp">1–20 个字符，昵称和成绩将公开显示。</p><p id="record-name-error" class="record-error" role="alert"></p>
+        </form>
+        <div class="record-actions"><button id="record-retry" class="tool" type="button" data-i18n="leaderboardRetry" hidden>重试</button><button id="record-skip" class="tool" type="button" data-i18n="recordSkip">这次跳过</button></div>
+      </section>
+      <p id="leaderboard-caption" class="leaderboard-caption"></p>
+      <div class="leaderboard-columns" aria-hidden="true"><span data-i18n="leaderboardRank">名次</span><span data-i18n="leaderboardName">选手</span><span data-i18n="leaderboardScore">最终比分</span><span data-i18n="leaderboardTime">总用时</span></div>
+      <ol id="leaderboard-entries" class="leaderboard-entries"></ol>
+      <p id="leaderboard-status" class="leaderboard-status" role="status" aria-live="polite"></p>
+      <p class="leaderboard-footnote" data-i18n="leaderboardNote">用时包含暂停与离开页面的时间。自定义规则也可参赛；完全相同的成绩保留先提交者。</p>
+    </section>
     <section class="controls" data-i18n-aria="controls" aria-label="操作说明">
       <div class="control-player p1"><span class="control-avatar">1</span><div><h3><span data-i18n="bluePlayer">蓝方选手</span> <small data-i18n="playerOne">一号选手</small></h3><div class="key-row"><span><kbd>A</kbd><kbd>D</kbd> <span data-i18n="move">移动</span></span><span><kbd>W</kbd> <span data-i18n="jump">跳跃</span></span><span><kbd>S</kbd> <span data-i18n="hit">蓄力击球</span></span><span><kbd>E</kbd> <span data-i18n="power">大力</span></span></div></div></div>
       <div id="p2-controls" class="control-player p2"><span class="control-avatar">2</span><div><h3><span data-i18n="redPlayer">红方选手</span> <small data-i18n="playerTwo">二号选手</small></h3><div class="key-row"><span><kbd>←</kbd><kbd>→</kbd> <span data-i18n="move">移动</span></span><span><kbd>↑</kbd> <span data-i18n="jump">跳跃</span></span><span><kbd>↓</kbd> <span data-i18n="hit">蓄力击球</span></span><span><kbd>/</kbd> <span data-i18n="power">大力</span></span></div></div></div>
@@ -151,6 +172,6 @@
     <p id="live-status" class="sr-only" aria-live="polite"></p>
   </main>
   <noscript><p class="noscript"><span lang="zh-CN">请开启 JavaScript 来玩火柴人羽毛球。</span><br><span lang="en">Please enable JavaScript to play Stick Badminton.</span></p></noscript>
-  <script type="module" src="game.mjs?v=low-wall-save-1"></script>
+  <script type="module" src="game.mjs?v=leaderboard-1"></script>
 </body>
 </html>

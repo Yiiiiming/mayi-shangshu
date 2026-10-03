@@ -48,6 +48,8 @@ If any serve restriction is selected, choose whether serves should **automatical
 
 **Scoring and walls:** first to 11, win by 2, capped at 15. Every rally scores a point, and its winner serves next. A shuttle landing in your half gives your opponent the point. Both back walls rebound the shuttle. Low wall rebounds rise slightly and slow down to give the receiver time to recover; a shuttle that has already landed stays dead. After the shuttle has crossed the net and then rebounded off a wall, even the original hitter can rescue it once it returns to their own half.
 
+**Shared AI leaderboard:** each AI difficulty has its own public top five below the court. Only completed single-player victories qualify. Rank by winning margin, then fewer AI points, then shorter time for identical scores; exact score/time ties retain the earlier record. Timing runs from match start to victory, including pauses and time away from the tab, with no live timer. A qualifying win asks for a nickname, and saving publishes that nickname, score and elapsed time to the shared board. Skipping leaves the win unsubmitted. The service rechecks rank when saving, supports idempotent retries and reports outages without pretending an empty local board is shared. Characters, venue and custom rules remain playable. This is a casual browser-reported board, not server-verified anti-cheat.
+
 ## 中文
 
 支持单人挑战电脑和本地双人对决的街机羽毛球小游戏，也提供触屏按钮。无需账号、插件或下载；画面、动作和音效均由代码生成。
@@ -95,6 +97,8 @@ If any serve restriction is selected, choose whether serves should **automatical
 **大力击球次数：**每人开局有 3 次，成功打出大力球消耗 1 次，挥空不扣次数。每人每成功回击 3 下球（普通和大力击球都算，发球不算），增加 1 次，次数没有上限。比分牌显示双方剩余次数和补充进度，次数与进度会保留到下一回合。用完后，按 E / 仍可普通击球。比分第一次到 **10–10** 时，会播放动画提示：**双方在本场剩余时间内都可无限大力击球**。重新开局后恢复为每人 3 次。
 
 **计分与墙壁：**11 分制，需净胜 2 分，15 分封顶；每球得分，得分方发下一球。球落在自己半场，对方得分。两侧后墙会反弹来球；靠近地面的反弹会稍微弹高并减速，给接球者留出救球时间，已经落地的球不会再次弹起。球成功越网后撞墙，再回到自己半场时，即使是原击球者，也能再次救球。
+
+**全站 AI 排行榜：**简单、中等、困难各有前 5，显示在球场下方。仅完成单人比赛并战胜 AI 才能入榜。先按净胜分，再按更少失分，相同比分按总用时排名；比分与用时完全相同时保留先上榜者。用时从开始比赛计到获胜，包括暂停和离开页面的时间，比赛中不显示计时器。成绩符合前 5 时询问昵称，确认提交后，昵称、比分与用时对所有访客公开；选择跳过不会上传。提交时会再次核对名次，网络失败可重试且不重复入榜。各角色、场馆与自定义规则仍可正常游玩。此为浏览器上报的休闲榜，并非服务器验算的防作弊比赛。
 
 ## Run locally / 本地运行
 
