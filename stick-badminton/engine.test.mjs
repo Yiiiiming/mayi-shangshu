@@ -965,7 +965,7 @@ test('normal rally holds cap at full power without swinging, then spend one rele
   }
 });
 
-test('tap, half and full normal charges have distinctly increasing range and mirror for both players', () => {
+test('tap, half and full charges gently extend normal range up to 30% and mirror for both players', () => {
   const flights = [0, 1].map((side) => [1 / 120, 0.375, 0.75].map((duration) => {
     const game = new Game(); game.start();
     holdRallyCharge(game, side, duration);
@@ -975,13 +975,107 @@ test('tap, half and full normal charges have distinctly increasing range and mir
     return { range: Math.abs(vx) * fallTime, speed: Math.abs(vx), vy, x };
   }));
   for (const flight of flights) {
-    assert.ok(flight[1].range > flight[0].range + 200);
-    assert.ok(flight[2].range > flight[1].range + 250);
-    assert.ok(flight[2].speed < 850);
+    assert.ok(flight[0].speed > 400, 'A tap must remain a full-strength return');
+    assert.ok(flight[1].range > flight[0].range * 1.13);
+    assert.ok(flight[1].range < flight[0].range * 1.16);
+    assert.ok(flight[2].range > flight[0].range * 1.28);
+    assert.ok(flight[2].range <= flight[0].range * 1.30);
+    assert.equal(flight[2].vy, flight[0].vy, 'Charging preserves the original lift');
   }
   for (let i = 0; i < 3; i++) {
     assert.ok(Math.abs(flights[0][i].range - flights[1][i].range) < 1e-8);
     assert.ok(Math.abs(flights[0][i].x + flights[1][i].x - WORLD.width) < 1e-8);
+  }
+});
+
+test('uncharged returns match the deployed pre-charge game and a full hold adds exactly 30%', () => {
+  // Golden contacts recorded from the pre-charge release da38ae5, not the new formula.
+  const contacts = [
+    { offset: 25, height: 100, vx: 0, vy: 0, incomingX: -400, incomingY: 180, expected: [430, -485.05] },
+    { offset: 100, height: 100, vx: 0, vy: 0, incomingX: -400, incomingY: 180, expected: [550, -421.3] },
+    { offset: -55, height: 100, vx: 0, vy: 0, incomingX: -400, incomingY: 180, expected: [302, -597.05] },
+    { offset: 25, height: 100, vx: 320, vy: 0, incomingX: -400, incomingY: 180, expected: [551.6, -485.05] },
+    { offset: 25, height: 40, vx: 0, vy: 0, incomingX: -400, incomingY: 180, expected: [430, -542.05] },
+    { offset: 82, height: 115, vx: 200, vy: -80, incomingX: -540, incomingY: 260, expected: [611.2, -424.75] },
+  ];
+  for (const side of [0, 1]) for (const charge of [0, 0.5, 1]) for (const c of contacts) {
+    const game = new Game(); game.start(); game.phase = 'playing';
+    const direction = side ? -1 : 1;
+    const x = side ? 780 : 320;
+    Object.assign(game.players[side], { x, y: 500, vx: c.vx * direction, vy: c.vy, shotCharge: charge });
+    Object.assign(game.shuttle, { x: x + c.offset * direction, y: 500 - c.height, vx: c.incomingX * direction, vy: c.incomingY });
+    game._strike(side, false);
+    assert.ok(Math.abs(game.shuttle.vx - direction * c.expected[0] * (1 + charge * 0.3)) < 1e-8);
+    assert.ok(Math.abs(game.shuttle.vy - c.expected[1]) < 1e-8);
+  }
+});
+
+test('ordinary taps and full charges clear the net from standard returning positions on both sides', () => {
+  for (const side of [0, 1]) for (const charge of [0, 1]) {
+    const game = contact({ side, charge });
+    for (let frame = 0; frame < 240 && (side ? game.shuttle.x > WORLD.netX : game.shuttle.x < WORLD.netX); frame++) game.update(1 / 240);
+    assert.equal(game.phase, 'playing');
+    assert.ok(side ? game.shuttle.x < WORLD.netX : game.shuttle.x > WORLD.netX);
+    assert.ok(!game.events.some(event => event.type === 'net'));
+  }
+});
+
+test('character abilities survive starting and restarting and unknown selections fall back to classic', () => {
+  const game = new Game({ characters: ['ninja', 'robot'] });
+  for (const reset of [() => {}, () => game.start(), () => game.reset()]) {
+    reset();
+    assert.deepEqual(game.characters, ['ninja', 'robot']);
+    assert.equal(game.players[0].characterId, 'ninja');
+    assert.equal(game.players[0].stats.speed, 1.1);
+    assert.equal(game.players[1].stats.power, 1.1);
+  }
+  game.setCharacters(['astro', 'unknown']); game.start();
+  assert.deepEqual(game.characters, ['astro', 'classic']);
+  assert.equal(game.players[0].stats.jumpHeight, 1.1);
+  assert.deepEqual(game.players[1].stats, { power: 1, speed: 1, jumpHeight: 1 });
+});
+
+test('ninja runs 10% faster and astronaut jumps 10% higher with no other movement advantage', () => {
+  for (const side of [0, 1]) {
+    const results = {};
+    for (const character of ['classic', 'ninja', 'robot', 'astro']) {
+      const game = new Game({ characters: [character, character] }); game.start();
+      const input = [{}, {}]; input[side][side ? 'left' : 'right'] = true;
+      advance(game, 0.25, input);
+      const speed = Math.abs(game.players[side].vx);
+      game.start(); input[side] = { jump: true }; let peak = WORLD.floorY;
+      for (let frame = 0; frame < 100; frame++) {
+        game.update(1 / 240, input); peak = Math.min(peak, game.players[side].y);
+      }
+      results[character] = { speed, height: WORLD.floorY - peak };
+    }
+    assert.ok(Math.abs(results.ninja.speed / results.classic.speed - 1.1) < 1e-8);
+    assert.ok(Math.abs(results.astro.height / results.classic.height - 1.1) < 0.001);
+    assert.equal(results.robot.speed, results.classic.speed);
+    assert.equal(results.astro.speed, results.classic.speed);
+    assert.equal(results.ninja.height, results.classic.height);
+    assert.equal(results.robot.height, results.classic.height);
+  }
+});
+
+test('robot adds 10% to rally shot strength at every charge, while all character serves keep their original flight', () => {
+  for (const side of [0, 1]) for (const serving of [false, true]) for (const charge of [0, 0.5, 1]) for (const shot of ['hit', 'power']) {
+    const flights = {};
+    for (const character of ['classic', 'robot', 'ninja', 'astro']) {
+      const game = new Game({ characters: [character, character] }); game.start();
+      const direction = side ? -1 : 1;
+      Object.assign(game.players[side], { x: side ? 780 : 320, y: 500, shotCharge: charge, _requestedShot: shot });
+      Object.assign(game.shuttle, { x: side ? 755 : 345, y: 300, vx: -400 * direction, vy: 180 });
+      game.serveCharge = charge; game._strike(side, serving);
+      flights[character] = { vx: game.shuttle.vx, vy: game.shuttle.vy };
+    }
+    assert.deepEqual(flights.ninja, flights.classic);
+    assert.deepEqual(flights.astro, flights.classic);
+    if (serving) assert.deepEqual(flights.robot, flights.classic);
+    else {
+      assert.ok(Math.abs(flights.robot.vx / flights.classic.vx - 1.1) < 1e-8);
+      if (shot === 'hit') assert.equal(flights.robot.vy, flights.classic.vy);
+    }
   }
 });
 

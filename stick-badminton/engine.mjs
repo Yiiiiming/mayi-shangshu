@@ -1,4 +1,5 @@
-/** Deterministic, dependency-free physics for a two-player arcade badminton court. */
+/** Deterministic physics for a two-player arcade badminton court. */
+import { CHARACTER_STATS } from './characters.mjs?v=gentle-charge-1';
 export const WORLD = Object.freeze({ width: 1100, height: 600, floorY: 500, netX: 550, netTop: 315, wallLeft: 28, wallRight: 1072, wallTop: 90, serviceLineLeft: 300, serviceLineRight: 800 });
 
 export const DEFAULT_RULES = Object.freeze({ allowServeWall: true, requireServiceLine: false, autoLegalServe: false, allowCombo: false });
@@ -10,9 +11,10 @@ const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const approach = (value, target, amount) => value < target ? Math.min(value + amount, target) : Math.max(value - amount, target);
 
 export class Game {
-  constructor({ target = 11, rules = {} } = {}) {
+  constructor({ target = 11, rules = {}, characters = ['classic', 'classic'] } = {}) {
     this.target = Number.isFinite(target) ? Math.max(1, Math.floor(target)) : 11;
     this.setRules(rules);
+    this.setCharacters(characters);
     this.reset();
   }
 
@@ -20,6 +22,16 @@ export class Game {
     this.rules = Object.freeze(Object.fromEntries(Object.entries(DEFAULT_RULES).map(([key, value]) =>
       [key, typeof rules?.[key] === 'boolean' ? rules[key] : value])));
     return this.rules;
+  }
+
+  setCharacters(characters = []) {
+    this.characters = Object.freeze([0, 1].map((side) =>
+      Object.hasOwn(CHARACTER_STATS, characters?.[side]) ? characters[side] : 'classic'));
+    this.players?.forEach((player, side) => {
+      player.characterId = this.characters[side];
+      player.stats = CHARACTER_STATS[player.characterId];
+    });
+    return this.characters;
   }
 
   get serveFlightActive() { return this._serveFlightActive; }
@@ -30,6 +42,7 @@ export class Game {
 
   reset() {
     this.players = [0, 1].map((side) => ({
+      characterId: this.characters[side], stats: CHARACTER_STATS[this.characters[side]],
       x: side ? 835 : 265, y: WORLD.floorY, vx: 0, vy: 0,
       facing: side ? -1 : 1, swing: 0, shot: 'hit',
       hitCharge: 0, hitCharging: false, shotCharge: 0, _hitBlocked: false, _powerWasDown: false,
@@ -237,7 +250,7 @@ export class Game {
     player._jumpWasDown = Boolean(input.jump);
 
     const direction = Number(Boolean(input.right)) - Number(Boolean(input.left));
-    player.vx = approach(player.vx, direction * 365, (direction ? 2600 : 3100) * dt);
+    player.vx = approach(player.vx, direction * 365 * player.stats.speed, (direction ? 2600 : 3100) * player.stats.speed * dt);
     player.x += player.vx * dt;
     let minX = side ? WORLD.netX + 37 : 62;
     let maxX = side ? WORLD.width - 62 : WORLD.netX - 37;
@@ -253,7 +266,7 @@ export class Game {
       player.vx = 0;
     }
     if (player.y >= WORLD.floorY && player._jumpBuffer > 0) {
-      player.vy = -670;
+      player.vy = -670 * Math.sqrt(player.stats.jumpHeight);
       player._jumpBuffer = 0;
       this._emit({ type: 'jump', player: side });
     }
@@ -355,6 +368,7 @@ export class Game {
     let horizontal;
     let vertical;
     const charge = serving ? this.serveCharge : attacking ? 0 : player.shotCharge;
+    const shotPower = serving ? 1 : player.stats.power;
     const maximumLift = Math.sqrt(2 * GRAVITY * Math.max(0, shuttle.y - 104));
 
     if (serving) {
@@ -386,7 +400,7 @@ export class Game {
     } else if (attacking) {
       // Power is an offensive drive/clear from either the ground or the air.
       // Contact and running momentum still change its speed and natural arc.
-      horizontal = clamp(980 + front * 170 + forwardSpeed * 0.26 + incomingSpeed * 0.10, 650, 1250);
+      horizontal = clamp(980 + front * 170 + forwardSpeed * 0.26 + incomingSpeed * 0.10, 650, 1250) * shotPower;
       vertical = -280 + front * 70 + highContact * 125
         + incomingFall * 0.035 + player.vy * 0.06 - behind * 40;
       const netDistance = (WORLD.netX - shuttle.x) * direction;
@@ -409,17 +423,17 @@ export class Game {
       const liftForWall = (WORLD.floorY - 90 - shuttle.y - 0.5 * GRAVITY * wallTime * wallTime) / wallTime;
       vertical = Math.min(vertical, liftForWall);
     } else {
-      // A quick tap is a short recovery/drop; holding sends the same contact
-      // much deeper. Position and momentum still shape every individual arc.
-      horizontal = 150 + Math.pow(charge, 1.3) * 470
-        + front * 160 + forwardSpeed * 0.38 + incomingSpeed * 0.10;
+      // Restore the pre-charge return at zero hold. Charging only adds up to
+      // 30% horizontal travel; the original contact-driven lift stays intact.
+      const baseHorizontal = clamp(390 + front * 160 + forwardSpeed * 0.38 + incomingSpeed * 0.10, 170, 950);
+      horizontal = baseHorizontal * (1 + 0.3 * clamp(charge, 0, 1)) * shotPower;
       vertical = -525 + front * 85 + (height - 75) * 0.95
         + highContact * 180 + incomingFall * 0.09 + player.vy * 0.12 - behind * 55;
     }
 
     // Keep high recovery lobs visible. Normal returns retain their entirely
     // contact-driven arc; an impossibly late low power shot can still net.
-    shuttle.vx = direction * clamp(horizontal, 170, attacking || serving ? 1250 : 850);
+    shuttle.vx = direction * clamp(horizontal, 170, (attacking || serving ? 1250 : 950 * 1.3) * shotPower);
     shuttle.vy = clamp(vertical, -maximumLift, 340);
     shuttle.active = true;
     shuttle.trail.length = 0;

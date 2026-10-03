@@ -1,13 +1,21 @@
 const INK = '#1a3038';
 const CREAM = '#f5efcd';
 
-// Characters change appearance only. Both teams use the same movement and reach.
+// Shared ability values are used by the game engine and character selection.
+// Power affects rally shots only; every character keeps the same serve controls.
+export const CHARACTER_STATS = Object.freeze({
+  classic: Object.freeze({ power: 1, speed: 1, jumpHeight: 1 }),
+  ninja: Object.freeze({ power: 1, speed: 1.1, jumpHeight: 1 }),
+  robot: Object.freeze({ power: 1.1, speed: 1, jumpHeight: 1 }),
+  astro: Object.freeze({ power: 1, speed: 1, jumpHeight: 1.1 }),
+});
+
 export const CHARACTERS = Object.freeze([
-  { id: 'classic', name: { zh: '追风', en: 'Breeze' }, description: { zh: '经典发带，轻装上场', en: 'Classic headband. Ready to rally.' } },
-  { id: 'ninja', name: { zh: '影刃', en: 'Shadow' }, description: { zh: '蒙面忍者，围巾随风', en: 'A masked ninja with a flying scarf.' } },
-  { id: 'robot', name: { zh: '小铁', en: 'Bolt' }, description: { zh: '方头天线，满格电量', en: 'A bright-eyed, fully charged robot.' } },
-  { id: 'astro', name: { zh: '星跃', en: 'Nova' }, description: { zh: '太空头盔，球场漫步', en: 'Space helmet. One giant leap.' } },
-].map((character) => Object.freeze(character)));
+  { id: 'classic', name: { zh: '追风', en: 'Breeze' }, description: { zh: '均衡型：标准力量、速度与跳跃', en: 'Balanced: standard power, speed and jump.' } },
+  { id: 'ninja', name: { zh: '影刃', en: 'Shadow' }, description: { zh: '移动速度 +10%', en: 'Movement speed +10%.' } },
+  { id: 'robot', name: { zh: '小铁', en: 'Bolt' }, description: { zh: '普通与大力击球力量 +10%；发球不变', en: 'Normal and power shots +10% power; serves unchanged.' } },
+  { id: 'astro', name: { zh: '星跃', en: 'Nova' }, description: { zh: '跳跃高度 +10%', en: 'Jump height +10%.' } },
+].map((character) => Object.freeze({ ...character, stats: CHARACTER_STATS[character.id] })));
 
 function ellipse(ctx, x, y, rx, ry, fill, stroke, width = 3) {
   ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);

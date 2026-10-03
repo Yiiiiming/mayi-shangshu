@@ -272,8 +272,7 @@ test('E and Slash select ground-level power swings for their own players', async
 const dynamicIds = ['overlay-label', 'overlay-title', 'overlay-copy', 'start', 'start-hint', 'court-status',
   'announcement', 'power-label', 'power-value', 'pause', 'sound', 'fullscreen', 'fullscreen-label', 'live-status',
   'power-stock-0', 'power-stock-1', 'power-count-0', 'power-count-1', 'power-progress-0', 'power-progress-1',
-  'deuce-title', 'deuce-copy', 'rules-summary', 'power-range-near', 'power-range-far',
-  'hit-charge-label-0', 'hit-charge-label-1', 'hit-charge-value-0', 'hit-charge-value-1'];
+  'deuce-title', 'deuce-copy', 'rules-summary', 'power-range-near', 'power-range-far'];
 function assertEnglish(h, ids = dynamicIds) {
   for (const id of ids) assert.doesNotMatch(h.text(h.get(id)), /\p{Script=Han}/u, `Chinese leaked into #${id}`);
 }
@@ -751,6 +750,8 @@ test('both players can choose all four characters, with independent drafts and a
   click(h, 'character-0-ninja'); click(h, 'character-1-robot');
   click(h, 'characters-confirm');
   assert.deepEqual(h.state().selectedCharacters, ['ninja', 'robot']);
+  assert.deepEqual(h.state().players.map((p) => p.characterId), ['ninja', 'robot']);
+  assert.deepEqual(h.state().players.map((p) => p.stats), [{ power: 1, speed: 1.1, jumpHeight: 1 }, { power: 1.1, speed: 1, jumpHeight: 1 }]);
   assert.equal(h.state().charactersConfirmed, true);
   assert.equal(h.state().charactersOpen, false);
   assert.equal(h.state().phase, 'ready');
@@ -758,31 +759,44 @@ test('both players can choose all four characters, with independent drafts and a
   click(h, 'characters-edit');
   click(h, 'character-1-ninja'); click(h, 'characters-confirm');
   assert.deepEqual(h.state().selectedCharacters, ['ninja', 'ninja'], 'Players may share a character');
+  assert.ok(h.state().players.every((p) => p.characterId === 'ninja' && p.stats.speed === 1.1 && p.stats.power === 1));
 });
 
 test('character selections survive match start, language switching and restart but cannot change during play', async () => {
   const h = await setup({ language: 'en', confirmCharacters: false, start: false });
   click(h, 'character-0-robot'); click(h, 'character-1-astro'); click(h, 'characters-confirm');
   const selected = ['robot', 'astro'];
+  const selectedStats = [{ power: 1.1, speed: 1, jumpHeight: 1 }, { power: 1, speed: 1, jumpHeight: 1.1 }];
+  const assertAbilities = () => {
+    assert.deepEqual(h.state().players.map((p) => p.characterId), selected);
+    assert.deepEqual(h.state().players.map((p) => p.stats), selectedStats);
+  };
+  assertAbilities();
   assert.equal(h.get('characters-edit').hidden, false);
   click(h, 'start'); h.tick(36);
   assert.deepEqual(h.state().selectedCharacters, selected);
+  assertAbilities();
   assert.equal(h.get('characters-edit').hidden, true);
   click(h, 'characters-edit'); click(h, 'character-0-ninja'); click(h, 'characters-confirm');
   assert.equal(h.state().charactersOpen, false);
   assert.deepEqual(h.state().selectedCharacters, selected);
+  assertAbilities();
   click(h, 'lang-switch'); click(h, 'choose-zh');
   assert.equal(h.state().paused, true);
   assert.deepEqual(h.state().selectedCharacters, selected);
+  assertAbilities();
   assert.equal(h.get('character-screen').hidden, true);
   click(h, 'start'); click(h, 'restart');
   assert.equal(h.state().phase, 'ready');
   assert.deepEqual(h.state().selectedCharacters, selected);
+  assertAbilities();
   assert.equal(h.get('characters-edit').hidden, false);
   click(h, 'characters-edit');
   assert.deepEqual(h.state().draftCharacters, selected);
   click(h, 'character-0-classic'); click(h, 'characters-confirm');
   assert.deepEqual(h.state().selectedCharacters, ['classic', 'astro']);
+  assert.deepEqual(h.state().players[0].stats, { power: 1, speed: 1, jumpHeight: 1 });
+  assert.equal(h.state().players[1].stats.jumpHeight, 1.1);
 });
 
 // Put a reachable incoming shuttle back at a known position each frame while
@@ -798,20 +812,14 @@ function chargeTicks(h, count, side = 0) {
   for (let i = 0; i < count; i++) { putIncomingShuttle(h, side); h.tick(); }
 }
 
-test('rally charge bars fill independently and normal swings wait for release even at full charge', async () => {
+test('normal shots charge independently and wait for release even at full charge', async () => {
   const h = await setup({ language: 'en' });
   putIncomingShuttle(h); h.tick();
-  assert.equal(h.get('rally-charge-0').hidden, false);
-  assert.equal(h.get('rally-charge-1').hidden, false);
   h.key('keydown', 'KeyS'); chargeTicks(h, 60);
   assert.equal(h.state().rally, 0, 'Holding within reach must not hit before release');
   assert.equal(h.state().players[0].hitCharging, true);
   assert.equal(h.state().players[0].hitCharge, 1);
-  assert.equal(h.get('hit-charge-value-0').textContent, '100%');
-  assert.equal(h.get('hit-charge-meter-0').attributes.get('aria-valuenow'), '100');
-  assert.equal(h.get('hit-charge-fill-0').style.transform, 'scaleX(1)');
   assert.equal(h.state().players[1].hitCharge, 0);
-  assert.equal(h.get('hit-charge-value-1').textContent, '0%');
   h.key('keydown', 'ArrowDown'); chargeTicks(h, 12);
   assert.ok(h.state().players[1].hitCharge > 0);
   assert.equal(h.state().players[0].hitCharge, 1);
@@ -819,9 +827,8 @@ test('rally charge bars fill independently and normal swings wait for release ev
   assert.equal(h.state().rally, 1);
   assert.equal(h.state().players[0].hitCharge, 0);
   assert.equal(h.state().players[0].hitCharging, false);
-  assert.equal(h.get('hit-charge-value-0').textContent, '0%');
   assert.equal(h.state().players[0].shotCharge, 0, 'A used release charge is consumed');
-  assert.ok(h.state().shuttle.vx > 600, 'Full charge produces a deep return');
+  assert.ok(h.state().shuttle.vx > 500, 'Full charge boosts the restored original return');
   assertEnglish(h);
 });
 
@@ -876,7 +883,7 @@ for (const event of ['pointercancel', 'lostpointercapture']) {
   });
 }
 
-test('point completion clears both rally bars and a held rally charge cannot become the next serve', async () => {
+test('point completion clears both rally charges and a held charge cannot become the next serve', async () => {
   const h = await setup();
   putIncomingShuttle(h); h.tick();
   h.key('keydown', 'KeyS'); h.key('keydown', 'ArrowDown'); chargeTicks(h, 18);
@@ -884,12 +891,34 @@ test('point completion clears both rally bars and a held rally charge cannot bec
   Object.assign(h.engine.shuttle, { x: 750, y: 496, vx: 0, vy: 10 }); h.tick();
   assert.equal(h.state().phase, 'point');
   assert.ok(h.state().players.every((player) => player.hitCharge === 0 && !player.hitCharging));
-  assert.equal(h.get('rally-charge-0').hidden, true);
-  assert.equal(h.get('rally-charge-1').hidden, true);
   h.tick(150);
   assert.equal(h.state().phase, 'serve');
   assert.equal(h.state().serveCharging, false);
   h.key('keyup', 'KeyS'); h.key('keyup', 'ArrowDown'); h.tick(3);
   assert.equal(h.state().phase, 'serve');
   assert.equal(h.state().serveCharging, false);
+});
+
+
+test('only serving displays a charge meter; normal returns retain hold and release controls', async () => {
+  const html = await readFile(new URL('./index.html', import.meta.url), 'utf8');
+  assert.doesNotMatch(html, /id="(?:rally-charge|hit-charge)-/);
+  for (const language of ['zh', 'en']) {
+    const h = await setup({ language });
+    assert.equal(h.get('serve-power').hidden, false);
+    h.key('keydown', 'KeyS'); h.tick(80);
+    assert.equal(h.get('power-value').textContent, '100%');
+    h.key('keyup', 'KeyS'); h.tick();
+    assert.equal(h.state().phase, 'playing');
+    assert.equal(h.get('serve-power').hidden, true);
+    putIncomingShuttle(h); h.tick();
+    const rallyBefore = h.state().rally;
+    h.key('keydown', 'KeyS'); chargeTicks(h, 50);
+    assert.equal(h.state().players[0].hitCharge, 1);
+    assert.equal(h.state().rally, rallyBefore);
+    putIncomingShuttle(h); h.key('keyup', 'KeyS'); h.tick();
+    assert.equal(h.state().rally, rallyBefore + 1);
+    assert.equal(h.state().players[0].hitCharge, 0);
+    assert.equal(h.get('serve-power').hidden, true);
+  }
 });

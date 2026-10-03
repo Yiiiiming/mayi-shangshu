@@ -7,7 +7,7 @@
   <meta id="page-description" name="description" content="Stick Badminton / 火柴人羽毛球. Choose English or 中文 and play together on one keyboard.">
   <title>Stick Badminton / 火柴人羽毛球</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=charge-roster-1">
+  <link rel="stylesheet" href="style.css?v=gentle-charge-1">
 </head>
 <body>
   <section id="language-screen" class="language-screen" aria-labelledby="language-title">
@@ -56,7 +56,7 @@
     <div class="rules-card character-card">
       <div class="rules-card-top"><span class="language-brand">STICK CLUB / 03</span><button id="characters-back" class="rules-back" data-i18n="charactersBack">返回规则</button></div>
       <h1 id="characters-title" data-i18n="charactersTitle">选好角色，一起上场。</h1>
-      <p class="rules-intro" data-i18n="charactersIntro">双方各选一个角色，可以选相同角色。外观不同，速度与击球能力相同。</p>
+      <p class="rules-intro" data-i18n="charactersIntro">双方各选一个角色，可以选相同角色。追风标准、小铁击球 +10%、影刃移动 +10%、星跃跳高 +10%；发球力度不受角色影响。</p>
       <div class="character-teams"><fieldset class="character-side character-side-0"><legend><span class="player-tag">P1</span> <span data-i18n="bluePlayer">蓝方选手</span></legend><div class="character-options"><button id="character-0-classic" class="character-option" type="button" aria-pressed="true"><span id="char-preview-0-classic" class="character-preview" aria-hidden="true"></span><strong id="char-name-0-classic"></strong><span id="char-desc-0-classic" class="character-desc"></span></button><button id="character-0-ninja" class="character-option" type="button" aria-pressed="false"><span id="char-preview-0-ninja" class="character-preview" aria-hidden="true"></span><strong id="char-name-0-ninja"></strong><span id="char-desc-0-ninja" class="character-desc"></span></button><button id="character-0-robot" class="character-option" type="button" aria-pressed="false"><span id="char-preview-0-robot" class="character-preview" aria-hidden="true"></span><strong id="char-name-0-robot"></strong><span id="char-desc-0-robot" class="character-desc"></span></button><button id="character-0-astro" class="character-option" type="button" aria-pressed="false"><span id="char-preview-0-astro" class="character-preview" aria-hidden="true"></span><strong id="char-name-0-astro"></strong><span id="char-desc-0-astro" class="character-desc"></span></button></div></fieldset><fieldset class="character-side character-side-1"><legend><span class="player-tag">P2</span> <span data-i18n="redPlayer">红方选手</span></legend><div class="character-options"><button id="character-1-classic" class="character-option" type="button" aria-pressed="true"><span id="char-preview-1-classic" class="character-preview" aria-hidden="true"></span><strong id="char-name-1-classic"></strong><span id="char-desc-1-classic" class="character-desc"></span></button><button id="character-1-ninja" class="character-option" type="button" aria-pressed="false"><span id="char-preview-1-ninja" class="character-preview" aria-hidden="true"></span><strong id="char-name-1-ninja"></strong><span id="char-desc-1-ninja" class="character-desc"></span></button><button id="character-1-robot" class="character-option" type="button" aria-pressed="false"><span id="char-preview-1-robot" class="character-preview" aria-hidden="true"></span><strong id="char-name-1-robot"></strong><span id="char-desc-1-robot" class="character-desc"></span></button><button id="character-1-astro" class="character-option" type="button" aria-pressed="false"><span id="char-preview-1-astro" class="character-preview" aria-hidden="true"></span><strong id="char-name-1-astro"></strong><span id="char-desc-1-astro" class="character-desc"></span></button></div></fieldset></div>
       <button id="characters-confirm" class="primary"><b data-i18n="charactersConfirm">确认角色，进入球场</b><span aria-hidden="true">↗</span></button>
     </div>
@@ -92,14 +92,6 @@
         <div id="power-meter" class="power-meter" role="meter" data-i18n-aria="powerMeter" aria-label="发球力量" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="power-fill"></span></div>
         <div class="power-range"><span id="power-range-near">网前</span><span id="power-range-far">撞墙</span></div>
       </div>
-      <div id="rally-charge-0" class="rally-charge rally-charge-0" hidden>
-        <div class="hit-charge-caption"><span id="hit-charge-label-0">P1</span><b id="hit-charge-value-0">0%</b></div>
-        <div id="hit-charge-meter-0" class="hit-charge-meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="hit-charge-fill-0"></span></div>
-      </div>
-      <div id="rally-charge-1" class="rally-charge rally-charge-1" hidden>
-        <div class="hit-charge-caption"><span id="hit-charge-label-1">P2</span><b id="hit-charge-value-1">0%</b></div>
-        <div id="hit-charge-meter-1" class="hit-charge-meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="hit-charge-fill-1"></span></div>
-      </div>
       <div id="deuce-banner" class="deuce-banner" hidden>
         <div id="deuce-card" class="deuce-card">
           <span class="deuce-score">10 : 10</span>
@@ -124,16 +116,16 @@
       <div class="control-player p1"><span class="control-avatar">1</span><div><h3><span data-i18n="bluePlayer">蓝方选手</span> <small data-i18n="playerOne">一号选手</small></h3><div class="key-row"><span><kbd>A</kbd><kbd>D</kbd> <span data-i18n="move">移动</span></span><span><kbd>W</kbd> <span data-i18n="jump">跳跃</span></span><span><kbd>S</kbd> <span data-i18n="hit">蓄力击球</span></span><span><kbd>E</kbd> <span data-i18n="power">大力</span></span></div></div></div>
       <div class="control-player p2"><span class="control-avatar">2</span><div><h3><span data-i18n="redPlayer">红方选手</span> <small data-i18n="playerTwo">二号选手</small></h3><div class="key-row"><span><kbd>←</kbd><kbd>→</kbd> <span data-i18n="move">移动</span></span><span><kbd>↑</kbd> <span data-i18n="jump">跳跃</span></span><span><kbd>↓</kbd> <span data-i18n="hit">蓄力击球</span></span><span><kbd>/</kbd> <span data-i18n="power">大力</span></span></div></div></div>
     </section>
-    <p class="charge-guide" data-i18n="chargeGuide">普通击球：按住 S / ↓ 蓄力，松开挥拍；轻点打近，蓄满打远。E / 仍可立即大力击球。</p>
+    <p class="charge-guide" data-i18n="chargeGuide">普通击球：轻点 S / ↓ 就有原来的力度；按住蓄力、松开挥拍，蓄满只增加 30% 距离。发球蓄力不变，E / 仍可立即大力击球。</p>
     <p class="power-rules" data-i18n="powerRule">大力开局各 3 次，成功击中 3 球补 1 次（不含发球）。挥空不扣；用完后按大力键仍可普通回球。10–10 后双方无限大力。</p>
     <div class="touch-controls" data-i18n-aria="touchControls" aria-label="触屏双人操作">
       <div class="touch-side p1"><button data-player="0" data-action="left" aria-label="蓝方向左">←</button><button data-player="0" data-action="right" aria-label="蓝方向右">→</button><button data-player="0" data-action="jump" aria-label="蓝方跳跃">跳</button><button data-player="0" data-action="hit" aria-label="蓝方挥拍">挥</button><button data-player="0" data-action="power" aria-label="蓝方大力击球">力</button></div>
       <div class="touch-side p2"><button data-player="1" data-action="left" aria-label="红方向左">←</button><button data-player="1" data-action="right" aria-label="红方向右">→</button><button data-player="1" data-action="jump" aria-label="红方跳跃">跳</button><button data-player="1" data-action="hit" aria-label="红方挥拍">挥</button><button data-player="1" data-action="power" aria-label="红方大力击球">力</button></div>
     </div>
-    <footer><p><span class="tip-label" data-i18n="tip">小提示</span> <span data-i18n="tipCopy">每次都可按住蓄力、松开击球；蓝方 E、红方 / 立即大力击球。</span><span class="alias" data-i18n="alias">F / K 也可蓄力。</span></p><div><span><kbd>P</kbd> <span data-i18n="pause">暂停</span></span><button id="restart" data-i18n="restart">重新开局 ↻</button></div></footer>
+    <footer><p><span class="tip-label" data-i18n="tip">小提示</span> <span data-i18n="tipCopy">轻点就有原力度，蓄力最多增加 30% 距离；蓝方 E、红方 / 立即大力击球。</span><span class="alias" data-i18n="alias">F / K 也可蓄力。</span></p><div><span><kbd>P</kbd> <span data-i18n="pause">暂停</span></span><button id="restart" data-i18n="restart">重新开局 ↻</button></div></footer>
     <p id="live-status" class="sr-only" aria-live="polite"></p>
   </main>
   <noscript><p class="noscript"><span lang="zh-CN">请开启 JavaScript 来玩火柴人羽毛球。</span><br><span lang="en">Please enable JavaScript to play Stick Badminton.</span></p></noscript>
-  <script type="module" src="game.mjs?v=charge-roster-1"></script>
+  <script type="module" src="game.mjs?v=gentle-charge-1"></script>
 </body>
 </html>

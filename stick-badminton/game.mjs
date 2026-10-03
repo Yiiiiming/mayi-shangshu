@@ -1,6 +1,6 @@
-import { Game, WORLD } from './engine.mjs?v=charge-roster-1';
-import { locales } from './locales.mjs?v=charge-roster-1';
-import { CHARACTERS, characterPreview, drawCharacterDetails } from './characters.mjs?v=charge-roster-1';
+import { Game, WORLD } from './engine.mjs?v=gentle-charge-1';
+import { locales } from './locales.mjs?v=gentle-charge-1';
+import { CHARACTERS, characterPreview, drawCharacterDetails } from './characters.mjs?v=gentle-charge-1';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('game');
@@ -175,7 +175,7 @@ for (const side of [0, 1]) for (const character of CHARACTERS) {
 }
 $('characters-confirm').addEventListener('click', () => {
   if (!languageSelected || !rulesConfirmed || !charactersOpen || rulesOpen) return;
-  selectedCharacters = [...draftCharacters]; charactersConfirmed = true; charactersOpen = false;
+  selectedCharacters = [...draftCharacters]; game.setCharacters(selectedCharacters); charactersConfirmed = true; charactersOpen = false;
   game.reset(); paused = false; clearInputs(); particles = []; transient = ''; deuceUntil = 0; lastUI = '';
   syncUI(); $('start').focus({ preventScroll: true });
 });
@@ -310,23 +310,12 @@ function syncUI() {
     $('overlay').hidden = true;
     $('serve-power').hidden = true;
     $('deuce-banner').hidden = true;
-    for (const side of [0, 1]) $(`rally-charge-${side}`).hidden = true;
     return;
   }
   const ruleMode = serveRuleKey(game.rules);
   const restricted = ruleMode !== 'open';
   $('rules-edit').hidden = game.phase !== 'ready' && game.phase !== 'over';
   $('characters-edit').hidden = $('rules-edit').hidden;
-  for (const side of [0, 1]) {
-    const player = game.players[side];
-    const percent = Math.round(player.hitCharge * 100);
-    $(`rally-charge-${side}`).hidden = game.phase !== 'playing' || paused;
-    $(`hit-charge-value-${side}`).textContent = `${percent}%`;
-    $(`hit-charge-fill-${side}`).style.transform = `scaleX(${player.hitCharge})`;
-    $(`hit-charge-meter-${side}`).setAttribute('aria-valuenow', String(percent));
-    $(`hit-charge-meter-${side}`).setAttribute('aria-label', copy.hitChargeMeter(names[side]));
-    $(`hit-charge-label-${side}`).textContent = `P${side + 1} · ${player.hitCharging ? (percent === 100 ? copy.hitChargeFull : copy.hitChargeCharging) : copy.hitChargeIdle}`;
-  }
   $('power-range-near').textContent = game.rules.autoLegalServe && game.rules.requireServiceLine ? copy.pastServiceLine : copy.near;
   $('power-range-far').textContent = !game.rules.allowServeWall ? (game.rules.autoLegalServe ? copy.legalDeep : copy.wallWarning) : copy.wall;
   $('deuce-banner').hidden = !game.unlimitedPower || time >= deuceUntil;
@@ -620,5 +609,5 @@ function frame(now) {
 }
 
 // Read-only snapshot for support and repeatable browser verification.
-window.badminton = Object.freeze({ snapshot: () => ({ language, languageSelected, rulesConfirmed, rulesOpen, charactersConfirmed, charactersOpen, selectedCharacters: [...selectedCharacters], draftCharacters: [...draftCharacters], rules: { ...game.rules }, phase: game.phase, score: [...game.score], unlimitedPower: game.unlimitedPower, paused, server: game.server, serveCharge: game.serveCharge, serveCharging: game.serveCharging, lastHitter: game.lastHitter, rally: game.rally, longestRally: game.longestRally, players: game.players.map(({ x, y, shot, powerCharges, powerProgress, hitCharge, hitCharging, shotCharge }) => ({ x, y, shot, powerCharges, powerProgress, hitCharge, hitCharging, shotCharge })), shuttle: { x: game.shuttle.x, y: game.shuttle.y, vx: game.shuttle.vx, vy: game.shuttle.vy, active: game.shuttle.active }, winner: game.winner }) });
+window.badminton = Object.freeze({ snapshot: () => ({ language, languageSelected, rulesConfirmed, rulesOpen, charactersConfirmed, charactersOpen, selectedCharacters: [...selectedCharacters], draftCharacters: [...draftCharacters], rules: { ...game.rules }, phase: game.phase, score: [...game.score], unlimitedPower: game.unlimitedPower, paused, server: game.server, serveCharge: game.serveCharge, serveCharging: game.serveCharging, lastHitter: game.lastHitter, rally: game.rally, longestRally: game.longestRally, players: game.players.map(({ x, y, shot, powerCharges, powerProgress, hitCharge, hitCharging, shotCharge, characterId, stats }) => ({ x, y, shot, powerCharges, powerProgress, hitCharge, hitCharging, shotCharge, characterId, stats: { ...stats } })), shuttle: { x: game.shuttle.x, y: game.shuttle.y, vx: game.shuttle.vx, vy: game.shuttle.vy, active: game.shuttle.active }, winner: game.winner }) });
 syncUI(); requestAnimationFrame(frame);
