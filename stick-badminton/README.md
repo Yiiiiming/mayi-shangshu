@@ -123,3 +123,7 @@ node --test engine.test.mjs ui.test.mjs ai.test.mjs court.test.mjs
 `engine.mjs` handles physics, scoring, and match state. `ai.mjs` controls the computer through the same inputs as a player. `game.mjs` handles drawing, controls, audio, language, and UI. Losing window focus automatically pauses the game; sound preferences stay on your device.
 
 `engine.mjs` 负责物理、计分和比赛状态；`ai.mjs` 通过与玩家相同的操作控制电脑；`game.mjs` 负责绘制、输入、音效、语言和界面。窗口失焦会自动暂停，音效偏好仅保存在本机。
+
+Single-player keyboard alternatives: ← / → move, ↑ jumps, ↓ charges and releases a serve or return, and / (including numpad divide) performs a power shot. WASD, F and E also work. In local two-player mode, the arrow keys and / control the red player.
+
+单人模式也可使用方向键：← / → 移动、↑ 跳跃、↓ 蓄力并松开发球或回球、/（含小键盘除号）大力击球。WASD、F 和 E 同样可用。双人模式中，方向键和 / 控制红方。

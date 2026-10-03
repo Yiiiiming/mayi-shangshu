@@ -1,5 +1,5 @@
-import { WORLD, advanceWallFlight } from './engine.mjs?v=clear-copy-1';
-import { COURT_WORLD } from './court.mjs?v=clear-copy-1';
+import { WORLD, advanceWallFlight } from './engine.mjs?v=solo-arrows-1';
+import { COURT_WORLD } from './court.mjs?v=solo-arrows-1';
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const PROFILES = Object.freeze({

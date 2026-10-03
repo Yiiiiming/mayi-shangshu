@@ -1,4 +1,4 @@
-import { DIFFICULTIES, formatTime, normalizeName, validResult } from './leaderboard.mjs?v=clear-copy-1';
+import { DIFFICULTIES, formatTime, normalizeName, validResult } from './leaderboard.mjs?v=solo-arrows-1';
 
 /** Shared-board rendering and opt-in submission, independent of match physics. */
 export class LeaderboardUI {

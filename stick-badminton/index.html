@@ -7,7 +7,7 @@
   <meta id="page-description" name="description" content="Stick Badminton / 火柴人羽毛球. Choose English or 中文. Play against the computer or share a keyboard with a friend.">
   <title>Stick Badminton / 火柴人羽毛球</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=clear-copy-1">
+  <link rel="stylesheet" href="style.css?v=solo-arrows-1">
 </head>
 <body>
   <section id="device-screen" class="device-screen" aria-labelledby="device-title" hidden>
@@ -165,7 +165,7 @@
       <p class="leaderboard-footnote" data-i18n="leaderboardNote">用时包含暂停与离开页面的时间。自定义规则也可参赛；完全相同的成绩保留先提交者。</p>
     </section>
     <section class="controls" data-i18n-aria="controls" aria-label="操作说明">
-      <div class="control-player p1"><span class="control-avatar">1</span><div><h3><span data-i18n="bluePlayer">蓝方选手</span> <small data-i18n="playerOne">一号选手</small></h3><div class="key-row"><span><kbd>A</kbd><kbd>D</kbd> <span data-i18n="move">移动</span></span><span><kbd>W</kbd> <span data-i18n="jump">跳跃</span></span><span><kbd>S</kbd> <span data-i18n="hit">蓄力击球</span></span><span><kbd>E</kbd> <span data-i18n="power">大力</span></span></div></div></div>
+      <div class="control-player p1"><span class="control-avatar">1</span><div><h3><span data-i18n="bluePlayer">蓝方选手</span> <small data-i18n="playerOne">一号选手</small></h3><div class="key-row"><span><kbd id="p1-key-left">A</kbd><kbd id="p1-key-right">D</kbd> <span data-i18n="move">移动</span></span><span><kbd id="p1-key-jump">W</kbd> <span data-i18n="jump">跳跃</span></span><span><kbd id="p1-key-hit">S</kbd> <span data-i18n="hit">蓄力击球</span></span><span><kbd id="p1-key-power">E</kbd> <span data-i18n="power">大力</span></span></div></div></div>
       <div id="p2-controls" class="control-player p2"><span class="control-avatar">2</span><div><h3><span data-i18n="redPlayer">红方选手</span> <small data-i18n="playerTwo">二号选手</small></h3><div class="key-row"><span><kbd>←</kbd><kbd>→</kbd> <span data-i18n="move">移动</span></span><span><kbd>↑</kbd> <span data-i18n="jump">跳跃</span></span><span><kbd>↓</kbd> <span data-i18n="hit">蓄力击球</span></span><span><kbd>/</kbd> <span data-i18n="power">大力</span></span></div></div></div>
       <div id="ai-controls" class="ai-controls" hidden><span class="control-avatar">AI</span><div><h3 data-i18n="computerPlayer">电脑选手</h3><p id="ai-controls-copy"></p></div></div>
     </section>
@@ -179,6 +179,6 @@
     <p id="live-status" class="sr-only" aria-live="polite"></p>
   </main>
   <noscript><p class="noscript"><span lang="zh-CN">请开启 JavaScript 来玩火柴人羽毛球。</span><br><span lang="en">Please enable JavaScript to play Stick Badminton.</span></p></noscript>
-  <script type="module" src="entry.mjs?v=clear-copy-1"></script>
+  <script type="module" src="entry.mjs?v=solo-arrows-1"></script>
 </body>
 </html>

@@ -1,13 +1,13 @@
-import { BadmintonAI } from './ai.mjs?v=clear-copy-1';
-import { Game, WORLD, RALLY_ACCELERATION } from './engine.mjs?v=clear-copy-1';
-import { locales } from './locales.mjs?v=clear-copy-1';
-import { CHARACTERS, characterPreview, drawCharacterDetails } from './characters.mjs?v=clear-copy-1';
-import { VENUES, venuePreview } from './venues.mjs?v=clear-copy-1';
-import { COURT_METERS } from './court.mjs?v=clear-copy-1';
-import { COURT_VIEW, COURT_OUTLINE, COURT_MARKINGS, projectCourtPoint, projectCourtMarking, courtLineWidth } from './court-view.mjs?v=clear-copy-1';
-import { LEADERBOARD_VERSION, LeaderboardClient, MatchClock } from './leaderboard.mjs?v=clear-copy-1';
-import { LEADERBOARD_API_BASE } from './leaderboard-config.mjs?v=clear-copy-1';
-import { LeaderboardUI } from './leaderboard-ui.mjs?v=clear-copy-1';
+import { BadmintonAI } from './ai.mjs?v=solo-arrows-1';
+import { Game, WORLD, RALLY_ACCELERATION } from './engine.mjs?v=solo-arrows-1';
+import { locales } from './locales.mjs?v=solo-arrows-1';
+import { CHARACTERS, characterPreview, drawCharacterDetails } from './characters.mjs?v=solo-arrows-1';
+import { VENUES, venuePreview } from './venues.mjs?v=solo-arrows-1';
+import { COURT_METERS } from './court.mjs?v=solo-arrows-1';
+import { COURT_VIEW, COURT_OUTLINE, COURT_MARKINGS, projectCourtPoint, projectCourtMarking, courtLineWidth } from './court-view.mjs?v=solo-arrows-1';
+import { LEADERBOARD_VERSION, LeaderboardClient, MatchClock } from './leaderboard.mjs?v=solo-arrows-1';
+import { LEADERBOARD_API_BASE } from './leaderboard-config.mjs?v=solo-arrows-1';
+import { LeaderboardUI } from './leaderboard-ui.mjs?v=solo-arrows-1';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('game');
@@ -134,6 +134,9 @@ function applyLanguage() {
     const label = { jump: 'touchJump', hit: 'touchHit', power: 'touchPower' }[button.dataset.action];
     if (label) button.textContent = copy[label];
   });
+  for (const [action, key, arrow] of [['left', 'A', '←'], ['right', 'D', '→'], ['jump', 'W', '↑'], ['hit', 'S', '↓'], ['power', 'E', '/']]) {
+    $(`p1-key-${action}`).textContent = selectedMode === 'single' ? `${key} · ${arrow}` : key;
+  }
   $('fullscreen-label').textContent = document.fullscreenElement ? copy.exitFullscreen : copy.fullscreen;
   $('power-label').textContent = copy.powerIdle;
   $('rule-rally-detail').textContent = copy.ruleRallyOnDetail(RALLY_ACCELERATION);
@@ -360,13 +363,13 @@ document.addEventListener('fullscreenchange', () => {
   canvas.focus({ preventScroll: true });
 });
 
-const rightPlayerKeys = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyK', 'Slash', 'NumpadDivide']);
+const inactiveSingleKeys = new Set(['KeyK']);
 const controlled = new Set(['KeyA', 'KeyD', 'KeyW', 'KeyS', 'KeyF', 'KeyE', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyK', 'Slash', 'NumpadDivide', 'Space', 'KeyP', 'Escape', 'KeyM']);
 window.addEventListener('keydown', (event) => {
   if (!canPlay() || event.ctrlKey || event.metaKey || event.altKey || !controlled.has(event.code)) return;
   if (event.target instanceof HTMLElement && event.target.matches('input, textarea, select, [contenteditable="true"]')) return;
   if (event.code === 'Space' && event.target instanceof HTMLButtonElement) return;
-  if (selectedMode === 'single' && rightPlayerKeys.has(event.code)) { event.preventDefault(); return; }
+  if (selectedMode === 'single' && inactiveSingleKeys.has(event.code)) { event.preventDefault(); return; }
   event.preventDefault();
   // After pause/blur, operating-system repeats must not revive canceled keys.
   if (event.repeat && !keys.has(event.code)) return;
@@ -414,8 +417,9 @@ document.querySelectorAll('[data-action]').forEach((button) => {
 });
 
 function inputs(dt) {
+  const single = selectedMode === 'single';
   const result = [
-    { left: keys.has('KeyA'), right: keys.has('KeyD'), jump: keys.has('KeyW'), hit: keys.has('KeyS') || keys.has('KeyF'), power: keys.has('KeyE') },
+    { left: keys.has('KeyA') || (single && keys.has('ArrowLeft')), right: keys.has('KeyD') || (single && keys.has('ArrowRight')), jump: keys.has('KeyW') || (single && keys.has('ArrowUp')), hit: keys.has('KeyS') || keys.has('KeyF') || (single && keys.has('ArrowDown')), power: keys.has('KeyE') || (single && (keys.has('Slash') || keys.has('NumpadDivide'))) },
     { left: keys.has('ArrowLeft'), right: keys.has('ArrowRight'), jump: keys.has('ArrowUp'), hit: keys.has('ArrowDown') || keys.has('KeyK'), power: keys.has('Slash') || keys.has('NumpadDivide') },
   ].map((input, side) => Object.fromEntries(Object.entries(input).map(([action, held]) => [action, held || Boolean(touch[side][action])])));
   if (selectedMode === 'single') result[1] = ai.update(game, dt);
@@ -514,7 +518,7 @@ function syncUI() {
     if (game.phase === 'serve') {
       $('announcement').textContent = copy.serve(names[game.server]);
       const small = document.createElement('small');
-      small.textContent = selectedMode === 'single' && game.server === 1 ? copy.computerServeHint : copy.serveHint(game.server === 0 ? 'S' : '↓', game.server === 0 ? 'F' : 'K');
+      small.textContent = selectedMode === 'single' && game.server === 1 ? copy.computerServeHint : copy.serveHint(game.server === 0 ? (selectedMode === 'single' ? 'S / ↓' : 'S') : '↓', game.server === 0 ? 'F' : 'K');
       $('announcement').append(small);
     } else if (game.phase === 'point') {
       $('announcement').textContent = `${names[game.server]} +1`;
