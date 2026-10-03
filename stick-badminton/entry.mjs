@@ -1,3 +1,3 @@
-import { startPage } from './device.mjs?v=emery-input-1';
+import { startPage } from './device.mjs?v=clear-copy-1';
 
 await startPage();

@@ -13,7 +13,7 @@ export const CHARACTER_STATS = Object.freeze({
 export const CHARACTERS = Object.freeze([
   { id: 'classic', name: { zh: '追风', en: 'Breeze' }, description: { zh: '均衡型：标准力量、速度与跳跃', en: 'Balanced: standard power, speed and jump.' } },
   { id: 'ninja', name: { zh: '影刃', en: 'Shadow' }, description: { zh: '移动速度 +10%', en: 'Movement speed +10%.' } },
-  { id: 'robot', name: { zh: '小铁', en: 'Bolt' }, description: { zh: '普通与大力击球力量 +10%；发球不变', en: 'Normal and power shots +10% power; serves unchanged.' } },
+  { id: 'robot', name: { zh: '小铁', en: 'Bolt' }, description: { zh: '普通与大力击球力量 +10%；发球采用标准力度', en: 'Normal and power shots +10% power; standard serve power.' } },
   { id: 'astro', name: { zh: '星跃', en: 'Nova' }, description: { zh: '跳跃高度 +10%', en: 'Jump height +10%.' } },
 ].map((character) => Object.freeze({ ...character, stats: CHARACTER_STATS[character.id] })));
 

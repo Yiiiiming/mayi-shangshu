@@ -7,14 +7,14 @@
   <meta id="page-description" name="description" content="Stick Badminton / 火柴人羽毛球. Choose English or 中文. Play against the computer or share a keyboard with a friend.">
   <title>Stick Badminton / 火柴人羽毛球</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=emery-input-1">
+  <link rel="stylesheet" href="style.css?v=clear-copy-1">
 </head>
 <body>
   <section id="device-screen" class="device-screen" aria-labelledby="device-title" hidden>
     <div class="device-card">
       <span class="language-brand">STICK BADMINTON / 火柴人羽毛球</span>
       <h1 id="device-title"><span lang="zh-CN">请用电脑打开</span><span lang="en">Open on a computer</span></h1>
-      <p class="device-copy"><span lang="zh-CN">暂不支持手机和平板。请用电脑浏览器打开这个网址，通过键盘开始比赛。</span><span lang="en">Phones and tablets are not supported yet. Open this page in a computer browser to play with a keyboard.</span></p>
+      <p class="device-copy"><span lang="zh-CN">本游戏使用电脑键盘操作。请用电脑浏览器打开这个网址，开始比赛。</span><span lang="en">This game uses a computer keyboard. Open this page in a computer browser to play.</span></p>
     </div>
   </section>
   <section id="language-screen" class="language-screen" aria-labelledby="language-title" hidden>
@@ -37,7 +37,7 @@
       <p class="rules-intro" data-i18n="modeIntro">单人挑战电脑，或和朋友共用键盘对决。</p>
       <fieldset><legend data-i18n="modePlayers">选择模式</legend><div class="rule-options mode-options">
         <button id="mode-single" type="button" aria-pressed="true"><strong data-i18n="modeSingle">单人挑战</strong><span data-i18n="modeSingleDetail">你控制蓝方，电脑控制红方。</span></button>
-        <button id="mode-local" type="button" aria-pressed="false"><strong data-i18n="modeLocal">本地双人</strong><span data-i18n="modeLocalDetail">两人共用键盘或触屏，各控制一方。</span></button>
+        <button id="mode-local" type="button" aria-pressed="false"><strong data-i18n="modeLocal">本地双人</strong><span data-i18n="modeLocalDetail">两人共用键盘，各控制一方。</span></button>
       </div></fieldset>
       <fieldset id="difficulty-options"><legend data-i18n="difficultyTitle">电脑难度</legend><div class="rule-options difficulty-options">
         <button id="difficulty-easy" type="button" aria-pressed="false"><strong data-i18n="difficultyEasy">简单</strong><span data-i18n="difficultyEasyDetail">反应较慢，适合练习。</span></button>
@@ -62,7 +62,7 @@
       </fieldset>
       <fieldset id="serve-assist-options"><legend data-i18n="rulesAssistTitle">2. 发球限制如何生效？</legend>
         <div class="rule-options">
-          <button id="rule-auto-off" type="button" aria-pressed="false"><strong data-i18n="ruleAutoOff">手动控制，违规失分</strong><span data-i18n="ruleAutoOffDetail">保持原有球路；违规时对手得 1 分。</span></button>
+          <button id="rule-auto-off" type="button" aria-pressed="false"><strong data-i18n="ruleAutoOff">手动控制，违规失分</strong><span data-i18n="ruleAutoOffDetail">自行控制发球站位与力度；违规时对手得 1 分。</span></button>
           <button id="rule-auto-on" type="button" aria-pressed="true"><strong data-i18n="ruleAutoOn">自动合规（默认）</strong><span data-i18n="ruleAutoOnDetail">调整发球站位与力度，满足所选限制。</span></button>
         </div>
       </fieldset>
@@ -74,11 +74,11 @@
       </fieldset>
       <fieldset><legend data-i18n="rulesRallyTitle">4. 长回合逐拍加速吗？</legend>
         <div class="rule-options">
-          <button id="rule-rally-off" type="button" aria-pressed="false"><strong data-i18n="ruleRallyOff">关闭</strong><span data-i18n="ruleRallyOffDetail">长回合保持原有球速。</span></button>
+          <button id="rule-rally-off" type="button" aria-pressed="false"><strong data-i18n="ruleRallyOff">关闭</strong><span data-i18n="ruleRallyOffDetail">球速不随回合拍数额外增加。</span></button>
           <button id="rule-rally-on" type="button" aria-pressed="true"><strong data-i18n="ruleRallyOn">逐拍加速（默认）</strong><span id="rule-rally-detail">长回合逐拍提高球速，每分恢复。</span></button>
         </div>
       </fieldset>
-      <p class="rules-note" data-i18n="rulesNote">发球限制到对方首次回击为止；对方提前接球视为接受发球。球越网后碰墙返回，仍可救球。自动合规只调整最初发球，后续连击仍按规则判定。</p>
+      <p class="rules-note" data-i18n="rulesNote">发球限制到对方首次回击为止；对方提前接球视为接受发球。球越网后碰墙返回，可以救球。自动合规只调整最初发球，后续连击按规则判定。</p>
       <button id="rules-confirm" class="primary"><b data-i18n="rulesConfirm">下一步：选择角色</b><span aria-hidden="true">↗</span></button>
     </div>
   </section>
@@ -169,16 +169,16 @@
       <div id="p2-controls" class="control-player p2"><span class="control-avatar">2</span><div><h3><span data-i18n="redPlayer">红方选手</span> <small data-i18n="playerTwo">二号选手</small></h3><div class="key-row"><span><kbd>←</kbd><kbd>→</kbd> <span data-i18n="move">移动</span></span><span><kbd>↑</kbd> <span data-i18n="jump">跳跃</span></span><span><kbd>↓</kbd> <span data-i18n="hit">蓄力击球</span></span><span><kbd>/</kbd> <span data-i18n="power">大力</span></span></div></div></div>
       <div id="ai-controls" class="ai-controls" hidden><span class="control-avatar">AI</span><div><h3 data-i18n="computerPlayer">电脑选手</h3><p id="ai-controls-copy"></p></div></div>
     </section>
-    <p class="charge-guide" data-i18n="chargeGuide">普通击球：轻点 S / ↓ 就有原来的力度；按住蓄力、松开挥拍，蓄满只增加 30% 距离。发球蓄力不变，E / 仍可立即大力击球。</p>
-    <p class="power-rules" data-i18n="powerRule">大力开局各 3 次，成功击中 3 球补 1 次（不含发球）。挥空不扣；用完后按大力键仍可普通回球。10–10 后双方无限大力。</p>
+    <p class="charge-guide" data-i18n="chargeGuide">普通击球：轻点 S / ↓ 挥拍；按住蓄力、松开击球，蓄满可增加 30% 距离。发球时按住蓄力、松开发出。可立即大力击球。</p>
+    <p class="power-rules" data-i18n="powerRule">大力开局各 3 次，成功击中 3 球补 1 次（不含发球）。挥空不扣；次数用完后，大力键发出普通回球。10–10 后双方无限大力。</p>
     <div class="touch-controls" data-i18n-aria="touchControls" aria-label="触屏双人操作">
       <div class="touch-side p1"><button data-player="0" data-action="left" aria-label="蓝方向左">←</button><button data-player="0" data-action="right" aria-label="蓝方向右">→</button><button data-player="0" data-action="jump" aria-label="蓝方跳跃">跳</button><button data-player="0" data-action="hit" aria-label="蓝方挥拍">挥</button><button data-player="0" data-action="power" aria-label="蓝方大力击球">力</button></div>
       <div id="p2-touch" class="touch-side p2"><button data-player="1" data-action="left" aria-label="红方向左">←</button><button data-player="1" data-action="right" aria-label="红方向右">→</button><button data-player="1" data-action="jump" aria-label="红方跳跃">跳</button><button data-player="1" data-action="hit" aria-label="红方挥拍">挥</button><button data-player="1" data-action="power" aria-label="红方大力击球">力</button></div>
     </div>
-    <footer><p><span class="tip-label" data-i18n="tip">小提示</span> <span data-i18n="tipCopy">轻点就有原力度，蓄力最多增加 30% 距离；蓝方 E、红方 / 立即大力击球。</span><span class="alias" data-i18n="alias">F / K 也可蓄力。</span></p><div><span><kbd>P</kbd> <span data-i18n="pause">暂停</span></span><button id="restart" data-i18n="restart">重新开局 ↻</button></div></footer>
+    <footer><p><span class="tip-label" data-i18n="tip">小提示</span> <span data-i18n="tipCopy">轻点挥拍，蓄力最多增加 30% 距离；蓝方 E、红方 / 立即大力击球。</span><span class="alias" data-i18n="alias">F / K 也可蓄力。</span></p><div><span><kbd>P</kbd> <span data-i18n="pause">暂停</span></span><button id="restart" data-i18n="restart">重新开局 ↻</button></div></footer>
     <p id="live-status" class="sr-only" aria-live="polite"></p>
   </main>
   <noscript><p class="noscript"><span lang="zh-CN">请开启 JavaScript 来玩火柴人羽毛球。</span><br><span lang="en">Please enable JavaScript to play Stick Badminton.</span></p></noscript>
-  <script type="module" src="entry.mjs?v=emery-input-1"></script>
+  <script type="module" src="entry.mjs?v=clear-copy-1"></script>
 </body>
 </html>
