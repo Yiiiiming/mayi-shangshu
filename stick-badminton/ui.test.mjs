@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 // Deterministic module-level integration: real game/engine with minimal DOM and
 // an explicitly advanced frame clock. This does not launch/control a browser.
 let instance = 0;
-async function setup({ language = 'zh', start = true, confirmRules = true, storedLanguage = null } = {}) {
+async function setup({ language = 'zh', start = true, confirmRules = true, confirmCharacters = true, storedLanguage = null } = {}) {
   const elements = new Map();
   let frameCallback;
   let now = 100;
@@ -52,7 +52,9 @@ async function setup({ language = 'zh', start = true, confirmRules = true, store
   class Button extends Element {}
   const buttonIds = new Set(['start', 'restart', 'pause', 'sound', 'fullscreen', 'choose-zh', 'choose-en', 'lang-switch',
     'rule-serve-open', 'rule-serve-no-wall', 'rule-serve-long', 'rule-serve-strict', 'rule-auto-off', 'rule-auto-on',
-    'rule-combo-off', 'rule-combo-on', 'rules-confirm', 'rules-language', 'rules-edit']);
+    'rule-combo-off', 'rule-combo-on', 'rules-confirm', 'rules-language', 'rules-edit',
+    'characters-confirm', 'characters-back', 'characters-edit',
+    ...[0, 1].flatMap((side) => ['classic', 'ninja', 'robot', 'astro'].map((id) => `character-${side}-${id}`))]);
   const get = (id) => {
     if (!elements.has(id)) elements.set(id, buttonIds.has(id) ? new Button() : new Element());
     return elements.get(id);
@@ -110,6 +112,7 @@ async function setup({ language = 'zh', start = true, confirmRules = true, store
   const pointer = (type, id = 1, side = 0, action = 'hit') => touchButtons.find((b) => +b.dataset.player === side && b.dataset.action === action).dispatch(type, { pointerId: id });
   if (language) get(`choose-${language}`).dispatch('click');
   if (language && confirmRules) get('rules-confirm').dispatch('click');
+  if (language && confirmRules && confirmCharacters) get('characters-confirm').dispatch('click');
   if (start) get('start').dispatch('click');
   tick(36);
   const text = (element) => [element.textContent, element.innerHTML, ...element.attributes.values(),
@@ -269,12 +272,13 @@ test('E and Slash select ground-level power swings for their own players', async
 const dynamicIds = ['overlay-label', 'overlay-title', 'overlay-copy', 'start', 'start-hint', 'court-status',
   'announcement', 'power-label', 'power-value', 'pause', 'sound', 'fullscreen', 'fullscreen-label', 'live-status',
   'power-stock-0', 'power-stock-1', 'power-count-0', 'power-count-1', 'power-progress-0', 'power-progress-1',
-  'deuce-title', 'deuce-copy', 'rules-summary', 'power-range-near', 'power-range-far'];
+  'deuce-title', 'deuce-copy', 'rules-summary', 'power-range-near', 'power-range-far',
+  'hit-charge-label-0', 'hit-charge-label-1', 'hit-charge-value-0', 'hit-charge-value-1'];
 function assertEnglish(h, ids = dynamicIds) {
   for (const id of ids) assert.doesNotMatch(h.text(h.get(id)), /\p{Script=Han}/u, `Chinese leaked into #${id}`);
 }
 
-test('every page entry requires language then rules confirmation, with no keyboard or hidden-button bypass', async () => {
+test('every page entry requires language, rules and character confirmation without hidden-button bypass', async () => {
   for (const storedLanguage of [null, 'zh', 'en']) {
     const h = await setup({ language: null, start: false, storedLanguage });
     assert.equal(h.get('language-screen').hidden, false);
@@ -296,8 +300,19 @@ test('every page entry requires language then rules confirmation, with no keyboa
     h.get('rules-confirm').dispatch('click'); h.tick();
     assert.equal(h.state().rulesConfirmed, true);
     assert.equal(h.state().rulesOpen, false);
+    assert.equal(h.get('overlay').hidden, true);
+    assert.equal(h.get('character-screen').hidden, false);
+    assert.equal(h.state().charactersConfirmed, false);
+    h.key('keydown', 'Space'); h.key('keyup', 'Space'); h.tick();
+    h.get('start').dispatch('click'); h.tick();
+    h.pointer('pointerdown'); h.tick(12); h.pointer('pointerup'); h.tick();
+    assert.equal(h.state().phase, 'ready');
+    assert.equal(h.get('character-screen').hidden, false);
+    h.get('characters-confirm').dispatch('click'); h.tick();
+    assert.equal(h.state().charactersConfirmed, true);
+    assert.equal(h.get('character-screen').hidden, true);
     assert.equal(h.get('overlay').hidden, false);
-    assert.equal(h.state().phase, 'ready', 'Confirming rules must not auto-start');
+    assert.equal(h.state().phase, 'ready', 'Confirming characters must not auto-start');
     h.get('start').dispatch('click'); h.tick();
     assert.equal(h.state().phase, 'serve');
   }
@@ -324,6 +339,8 @@ test('rules menu starts with unrestricted serves and no automatic assistance or 
   assert.deepEqual(h.engine.rules, defaultRules);
   assert.equal(h.get('rules-screen').hidden, true);
   assert.equal(h.state().phase, 'ready');
+  assert.equal(h.get('character-screen').hidden, false);
+  click(h, 'characters-confirm');
   assert.ok(h.get('rules-summary').textContent.trim());
   assertEnglish(h);
 });
@@ -343,6 +360,7 @@ test('all four serve choices and optional assistance reach the actual game engin
       const expected = { allowServeWall, requireServiceLine, autoLegalServe: assisted, allowCombo: true };
       assert.deepEqual(h.state().rules, expected);
       assert.deepEqual(h.engine.rules, expected);
+      click(h, 'characters-confirm');
       click(h, 'start');
       assert.equal(h.state().phase, 'serve');
       assert.deepEqual(h.engine.rules, expected, 'Starting must retain the confirmed options');
@@ -375,6 +393,7 @@ test('removing serve restrictions clears hidden automatic assistance and returni
 test('confirmed rules survive restart and an in-match language switch; rules cannot change mid-match', async () => {
   const h = await setup({ language: 'en', confirmRules: false, start: false });
   click(h, 'rule-serve-strict'); click(h, 'rule-auto-on'); click(h, 'rule-combo-on'); click(h, 'rules-confirm');
+  click(h, 'characters-confirm');
   const expected = { allowServeWall: false, requireServiceLine: true, autoLegalServe: true, allowCombo: true };
   assert.equal(h.get('rules-edit').hidden, false);
   click(h, 'start'); h.tick(36);
@@ -418,6 +437,8 @@ test('editing rules after match end confirms a fresh ready screen without auto-s
   assert.equal(h.state().phase, 'ready');
   assert.deepEqual(h.state().score, [0, 0]);
   assert.equal(h.state().rules.allowServeWall, false);
+  assert.equal(h.get('character-screen').hidden, false);
+  click(h, 'characters-confirm');
   assert.equal(h.get('overlay').hidden, false);
   click(h, 'start');
   assert.equal(h.state().phase, 'serve');
@@ -694,4 +715,181 @@ test('a real 10–10 match unlocks infinite counters and a localized announcemen
   assert.equal(h.get('power-count-0').textContent, '3');
   assert.equal(h.get('power-count-1').textContent, '3');
   assert.equal(h.get('deuce-banner').hidden, true);
+});
+
+const characterIds = ['classic', 'ninja', 'robot', 'astro'];
+test('both players can choose all four characters, with independent drafts and an explicit confirmation', async () => {
+  const h = await setup({ language: 'en', confirmCharacters: false, start: false });
+  assert.equal(h.state().charactersOpen, true);
+  assert.equal(h.get('character-screen').hidden, false);
+  assert.equal(h.get('game-shell').hidden, true);
+  assert.deepEqual(h.state().selectedCharacters, ['classic', 'classic']);
+  for (const side of [0, 1]) {
+    for (const id of characterIds) {
+      click(h, `character-${side}-${id}`);
+      assert.equal(h.state().draftCharacters[side], id);
+      assert.deepEqual(h.state().selectedCharacters, ['classic', 'classic'], 'Choices remain drafts until confirmation');
+      for (const other of characterIds) {
+        assert.equal(h.get(`character-${side}-${other}`).attributes.get('aria-pressed'), String(other === id));
+        assert.ok(h.get(`char-preview-${side}-${other}`).innerHTML, 'Each option needs its actual character preview');
+        for (const type of ['name', 'desc']) {
+          const value = h.text(h.get(`char-${type}-${side}-${other}`));
+          assert.ok(value.trim());
+          assert.doesNotMatch(value, /undefined|\p{Script=Han}/u, 'Character copy must be complete English');
+        }
+      }
+    }
+  }
+  click(h, 'character-0-ninja'); click(h, 'character-1-robot');
+  click(h, 'characters-back');
+  assert.equal(h.state().rulesOpen, true);
+  assert.equal(h.state().charactersOpen, false);
+  assert.equal(h.get('rules-screen').hidden, false);
+  click(h, 'characters-confirm');
+  assert.equal(h.state().charactersConfirmed, false, 'Hidden confirmation cannot skip the rules screen');
+  click(h, 'rules-confirm');
+  click(h, 'character-0-ninja'); click(h, 'character-1-robot');
+  click(h, 'characters-confirm');
+  assert.deepEqual(h.state().selectedCharacters, ['ninja', 'robot']);
+  assert.equal(h.state().charactersConfirmed, true);
+  assert.equal(h.state().charactersOpen, false);
+  assert.equal(h.state().phase, 'ready');
+  assert.equal(h.get('overlay').hidden, false);
+  click(h, 'characters-edit');
+  click(h, 'character-1-ninja'); click(h, 'characters-confirm');
+  assert.deepEqual(h.state().selectedCharacters, ['ninja', 'ninja'], 'Players may share a character');
+});
+
+test('character selections survive match start, language switching and restart but cannot change during play', async () => {
+  const h = await setup({ language: 'en', confirmCharacters: false, start: false });
+  click(h, 'character-0-robot'); click(h, 'character-1-astro'); click(h, 'characters-confirm');
+  const selected = ['robot', 'astro'];
+  assert.equal(h.get('characters-edit').hidden, false);
+  click(h, 'start'); h.tick(36);
+  assert.deepEqual(h.state().selectedCharacters, selected);
+  assert.equal(h.get('characters-edit').hidden, true);
+  click(h, 'characters-edit'); click(h, 'character-0-ninja'); click(h, 'characters-confirm');
+  assert.equal(h.state().charactersOpen, false);
+  assert.deepEqual(h.state().selectedCharacters, selected);
+  click(h, 'lang-switch'); click(h, 'choose-zh');
+  assert.equal(h.state().paused, true);
+  assert.deepEqual(h.state().selectedCharacters, selected);
+  assert.equal(h.get('character-screen').hidden, true);
+  click(h, 'start'); click(h, 'restart');
+  assert.equal(h.state().phase, 'ready');
+  assert.deepEqual(h.state().selectedCharacters, selected);
+  assert.equal(h.get('characters-edit').hidden, false);
+  click(h, 'characters-edit');
+  assert.deepEqual(h.state().draftCharacters, selected);
+  click(h, 'character-0-classic'); click(h, 'characters-confirm');
+  assert.deepEqual(h.state().selectedCharacters, ['classic', 'astro']);
+});
+
+// Put a reachable incoming shuttle back at a known position each frame while
+// holding the button. This isolates UI/input timing from the flight simulation,
+// which is independently tested by the engine suite.
+function putIncomingShuttle(h, side = 0) {
+  const player = h.engine.players[side];
+  h.engine.phase = 'playing';
+  h.engine.lastHitter = 1 - side;
+  Object.assign(h.engine.shuttle, { x: player.x + player.facing * 40, y: player.y - 80, vx: 0, vy: 0, active: true });
+}
+function chargeTicks(h, count, side = 0) {
+  for (let i = 0; i < count; i++) { putIncomingShuttle(h, side); h.tick(); }
+}
+
+test('rally charge bars fill independently and normal swings wait for release even at full charge', async () => {
+  const h = await setup({ language: 'en' });
+  putIncomingShuttle(h); h.tick();
+  assert.equal(h.get('rally-charge-0').hidden, false);
+  assert.equal(h.get('rally-charge-1').hidden, false);
+  h.key('keydown', 'KeyS'); chargeTicks(h, 60);
+  assert.equal(h.state().rally, 0, 'Holding within reach must not hit before release');
+  assert.equal(h.state().players[0].hitCharging, true);
+  assert.equal(h.state().players[0].hitCharge, 1);
+  assert.equal(h.get('hit-charge-value-0').textContent, '100%');
+  assert.equal(h.get('hit-charge-meter-0').attributes.get('aria-valuenow'), '100');
+  assert.equal(h.get('hit-charge-fill-0').style.transform, 'scaleX(1)');
+  assert.equal(h.state().players[1].hitCharge, 0);
+  assert.equal(h.get('hit-charge-value-1').textContent, '0%');
+  h.key('keydown', 'ArrowDown'); chargeTicks(h, 12);
+  assert.ok(h.state().players[1].hitCharge > 0);
+  assert.equal(h.state().players[0].hitCharge, 1);
+  putIncomingShuttle(h); h.key('keyup', 'KeyS'); h.tick();
+  assert.equal(h.state().rally, 1);
+  assert.equal(h.state().players[0].hitCharge, 0);
+  assert.equal(h.state().players[0].hitCharging, false);
+  assert.equal(h.get('hit-charge-value-0').textContent, '0%');
+  assert.equal(h.state().players[0].shotCharge, 0, 'A used release charge is consumed');
+  assert.ok(h.state().shuttle.vx > 600, 'Full charge produces a deep return');
+  assertEnglish(h);
+});
+
+test('aliases and touch are one rally charge and releasing only one source cannot hit early', async () => {
+  const h = await setup();
+  putIncomingShuttle(h); h.tick();
+  h.key('keydown', 'KeyS'); chargeTicks(h, 6);
+  h.key('keydown', 'KeyF'); h.pointer('pointerdown'); chargeTicks(h, 6);
+  h.key('keyup', 'KeyS'); chargeTicks(h, 6);
+  assert.equal(h.state().rally, 0);
+  h.key('keyup', 'KeyF'); chargeTicks(h, 6);
+  assert.equal(h.state().players[0].hitCharging, true);
+  assert.equal(h.state().rally, 0);
+  putIncomingShuttle(h); h.pointer('pointerup'); h.tick();
+  assert.equal(h.state().rally, 1);
+  assert.equal(h.state().players[0].hitCharge, 0);
+  assert.equal(h.state().players[0].shotCharge, 0);
+  assert.ok(h.state().shuttle.vx > 330, 'Combined hold duration powers the return');
+});
+
+test('pausing a rally clears charge and stale held-key releases cannot swing after resume', async () => {
+  const h = await setup();
+  putIncomingShuttle(h); h.tick();
+  h.key('keydown', 'KeyS'); chargeTicks(h, 24);
+  assert.ok(h.state().players[0].hitCharge > 0);
+  h.key('keydown', 'KeyP'); h.key('keyup', 'KeyP'); h.tick();
+  assert.equal(h.state().paused, true);
+  assert.equal(h.state().players[0].hitCharge, 0);
+  assert.equal(h.state().players[0].hitCharging, false);
+  h.get('start').dispatch('click');
+  h.key('keydown', 'KeyS', { repeat: true }); chargeTicks(h, 6);
+  h.key('keyup', 'KeyS'); chargeTicks(h, 3);
+  assert.equal(h.state().rally, 0);
+  h.key('keydown', 'KeyS'); chargeTicks(h, 8);
+  putIncomingShuttle(h); h.key('keyup', 'KeyS'); h.tick();
+  assert.equal(h.state().rally, 1);
+});
+
+for (const event of ['pointercancel', 'lostpointercapture']) {
+  test(`${event} cancels the player's rally charge without firing a delayed hit`, async () => {
+    const h = await setup();
+    putIncomingShuttle(h); h.tick();
+    h.pointer('pointerdown'); chargeTicks(h, 24);
+    assert.ok(h.state().players[0].hitCharge > 0);
+    h.pointer(event); chargeTicks(h, 6);
+    assert.equal(h.state().players[0].hitCharge, 0);
+    assert.equal(h.state().players[0].hitCharging, false);
+    assert.equal(h.state().rally, 0);
+    h.pointer('pointerdown', 2); chargeTicks(h, 6);
+    putIncomingShuttle(h); h.pointer('pointerup', 2); h.tick();
+    assert.equal(h.state().rally, 1);
+  });
+}
+
+test('point completion clears both rally bars and a held rally charge cannot become the next serve', async () => {
+  const h = await setup();
+  putIncomingShuttle(h); h.tick();
+  h.key('keydown', 'KeyS'); h.key('keydown', 'ArrowDown'); chargeTicks(h, 18);
+  assert.ok(h.state().players.every((player) => player.hitCharge > 0));
+  Object.assign(h.engine.shuttle, { x: 750, y: 496, vx: 0, vy: 10 }); h.tick();
+  assert.equal(h.state().phase, 'point');
+  assert.ok(h.state().players.every((player) => player.hitCharge === 0 && !player.hitCharging));
+  assert.equal(h.get('rally-charge-0').hidden, true);
+  assert.equal(h.get('rally-charge-1').hidden, true);
+  h.tick(150);
+  assert.equal(h.state().phase, 'serve');
+  assert.equal(h.state().serveCharging, false);
+  h.key('keyup', 'KeyS'); h.key('keyup', 'ArrowDown'); h.tick(3);
+  assert.equal(h.state().phase, 'serve');
+  assert.equal(h.state().serveCharging, false);
 });

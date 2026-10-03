@@ -40,12 +40,12 @@ test('only the correct server can start; the serve clears the net', () => {
   assert.ok(!game.events.some((event) => event.type === 'net'));
 });
 
-test('stationary held swings can return several shots but do not lock the game into a loop', () => {
+test('holding normal hit throughout a rally never swings automatically', () => {
   const game = new Game();
   game.start();
   serve(game);
   advance(game, 80, [{ hit: true }, { hit: true }]);
-  assert.ok(game.longestRally >= 3, `rally only reached ${game.longestRally}`);
+  assert.equal(game.longestRally, 1, 'only the initial serve should count as contact');
   assert.ok(game.score[0] + game.score[1] > 0, 'footwork should be needed to keep returning every shot');
   assert.ok(Number.isFinite(game.shuttle.x) && Number.isFinite(game.shuttle.y));
 });
@@ -56,7 +56,9 @@ test('a player cannot hit the shuttle twice in succession', () => {
   serve(game);
   const rally = game.rally;
   Object.assign(game.shuttle, { x: 290, y: 430, vx: 0, vy: 0 });
-  advance(game, 0.25, [{ hit: true }]);
+  advance(game, 0.1, []);
+  game.update(1 / 240, [{ hit: true }]);
+  game.update(1 / 240, []);
   assert.equal(game.rally, rally);
   assert.equal(game.lastHitter, 0);
 });
@@ -154,6 +156,7 @@ test('an aerial power shot is faster than a normal clear and clears the tape', (
     Object.assign(game.players[0], { x: 325, y: 390, vx: 0, vy: 0 });
     Object.assign(game.shuttle, { x: 350, y: 260, vx: -100, vy: 100, active: true });
     game.update(1 / 120, [{ [shot]: true }, {}]);
+    if (shot === 'hit') game.update(1 / 120, []);
     return game;
   };
   const normal = makeContact('hit');
@@ -185,6 +188,7 @@ test('a very low last-second save near the net does not launch into a huge offsc
   Object.assign(game.players[0], { x: 510, y: 500 });
   Object.assign(game.shuttle, { x: 541, y: 435, vx: -50, vy: 200, active: true });
   game.update(1 / 120, [{ hit: true }]);
+  game.update(1 / 120, []);
   assert.equal(game.lastHitter, 0);
   assert.ok(game.shuttle.vy > -800);
   advance(game, 0.2);
@@ -208,7 +212,9 @@ test('the original hitter can rescue a wall rebound that crosses back to their c
   game.lastHitter = 0;
   game.rally = 1;
   Object.assign(game.shuttle, { x: 1070, y: 230, vx: 950, vy: -200, active: true });
-  advance(game, 1.2, [{ hit: true }, {}]);
+  for (let frame = 0; frame < 240 && game.shuttle.x > 430; frame += 1) game.update(1 / 120, [{ hit: true }, {}]);
+  game.update(1 / 120, []);
+  advance(game, 0.2);
   assert.ok(game.events.some((event) => event.type === 'wall' && event.side === 1));
   assert.ok(game.events.some((event) => event.type === 'hit' && event.player === 0));
   assert.equal(game.rally, 2);
@@ -216,15 +222,21 @@ test('the original hitter can rescue a wall rebound that crosses back to their c
   assert.equal(game.phase, 'playing');
 });
 
-function contact({ side = 0, offset = 25, height = 100, incomingX = -400, incomingY = 180, playerX = 0, playerY = 0, shot = 'hit' } = {}) {
+function contact({ side = 0, offset = 25, height = 100, incomingX = -400, incomingY = 180, playerX = 0, playerY = 0, shot = 'hit', charge = 0.5 } = {}) {
   const game = new Game();
   game.start();
   game.phase = 'playing';
   game.lastHitter = 1 - side;
   const direction = side ? -1 : 1;
+  if (shot === 'hit') {
+    const held = [{}, {}];
+    held[side].hit = true;
+    game.update(1 / 240, held);
+    game.players[side].hitCharge = charge;
+  }
   Object.assign(game.players[side], { x: side ? 780 : 320, y: 500, vx: playerX * direction, vy: playerY });
   Object.assign(game.shuttle, { x: game.players[side].x + offset * direction, y: 500 - height, vx: incomingX * direction, vy: incomingY, active: true });
-  const input = { [shot]: true };
+  const input = { [shot]: shot !== 'hit' };
   if (playerX) input[playerX * direction > 0 ? 'right' : 'left'] = true;
   const inputs = [{}, {}];
   inputs[side] = input;
@@ -503,6 +515,15 @@ test('long varied-input sessions remain finite, within the walls, and visibly on
 function rallyContact(game, side, shot = 'hit') {
   game.phase = 'playing';
   game.lastHitter = 1 - side;
+  // Clear the previous physical key state before this independent contact.
+  game._actionDown[side] = false;
+  game.players[side]._hitBlocked = false;
+  game.players[side]._powerWasDown = false;
+  if (shot === 'hit') {
+    const held = [{}, {}];
+    held[side].hit = true;
+    game.update(1 / 240, held);
+  }
   const player = game.players[side];
   Object.assign(player, { x: side ? 780 : 320, y: 500, vx: 0, vy: 0, _attackCooldown: 0, _hitCooldown: 0 });
   Object.assign(game.shuttle, {
@@ -510,7 +531,7 @@ function rallyContact(game, side, shot = 'hit') {
     vx: -400 * player.facing, vy: 150, active: true,
   });
   const inputs = [{}, {}];
-  inputs[side][shot] = true;
+  inputs[side][shot] = shot !== 'hit';
   const oldRally = game.rally;
   game.update(1 / 240, inputs);
   assert.equal(game.lastHitter, side, 'fixture must make actual racket contact');
@@ -909,4 +930,117 @@ test('own combos keep serve restrictions active and cannot turn a prohibited wal
     assert.deepEqual(game.score, [0, 1]);
     assert.equal(game.events.filter((event) => event.type === 'point').length, 1);
   }
+});
+
+function holdRallyCharge(game, side, duration, inputs = [{}, {}]) {
+  inputs[side] = { ...inputs[side], hit: true };
+  game.phase = 'playing';
+  game.lastHitter = 1 - side;
+  for (let step = 0; step < Math.ceil(duration * 120); step++) {
+    const p = game.players[side];
+    Object.assign(game.shuttle, { x: p.x + p.facing * 40, y: p.y - 80, vx: 0, vy: 0, active: true });
+    game.update(1 / 120, inputs);
+  }
+  const p = game.players[side];
+  Object.assign(game.shuttle, { x: p.x + p.facing * 40, y: p.y - 80, vx: 0, vy: 0, active: true });
+  return inputs;
+}
+
+test('normal rally holds cap at full power without swinging, then spend one release on contact', () => {
+  for (const side of [0, 1]) {
+    const game = new Game(); game.start();
+    holdRallyCharge(game, side, 1.5);
+    assert.equal(game.rally, 0);
+    assert.equal(game.players[side].hitCharge, 1);
+    assert.equal(game.players[side].hitCharging, true);
+    game.update(1 / 120);
+    assert.equal(game.rally, 1);
+    assert.equal(game.events.at(-1).type, 'hit');
+    assert.equal(game.events.at(-1).charge, 1);
+    assert.equal(game.players[side].hitCharge, 0);
+    assert.equal(game.players[side].shotCharge, 0);
+    assert.equal(game.players[side].powerProgress, 1);
+    advance(game, 0.2);
+    assert.equal(game.rally, 1);
+  }
+});
+
+test('tap, half and full normal charges have distinctly increasing range and mirror for both players', () => {
+  const flights = [0, 1].map((side) => [1 / 120, 0.375, 0.75].map((duration) => {
+    const game = new Game(); game.start();
+    holdRallyCharge(game, side, duration);
+    game.update(1 / 120);
+    const { x, y, vx, vy } = game.shuttle;
+    const fallTime = (-vy + Math.sqrt(vy * vy + 2 * 680 * (496 - y))) / 680;
+    return { range: Math.abs(vx) * fallTime, speed: Math.abs(vx), vy, x };
+  }));
+  for (const flight of flights) {
+    assert.ok(flight[1].range > flight[0].range + 200);
+    assert.ok(flight[2].range > flight[1].range + 250);
+    assert.ok(flight[2].speed < 850);
+  }
+  for (let i = 0; i < 3; i++) {
+    assert.ok(Math.abs(flights[0][i].range - flights[1][i].range) < 1e-8);
+    assert.ok(Math.abs(flights[0][i].x + flights[1][i].x - WORLD.width) < 1e-8);
+  }
+});
+
+test('a released rally swing catches briefly arriving shuttles but expires after a miss', () => {
+  for (const delay of [0.1, 0.22]) {
+    const game = new Game(); game.start();
+    holdRallyCharge(game, 0, 0.5);
+    Object.assign(game.shuttle, { x: 550, y: 140, vx: 0, vy: 0 });
+    game.update(1 / 120); advance(game, delay);
+    Object.assign(game.shuttle, { x: 305, y: 420, vx: 0, vy: 0 });
+    game.update(1 / 120);
+    assert.equal(game.rally, delay < 0.18 ? 1 : 0);
+    assert.equal(game.players[0].hitCharging, false);
+    assert.equal(game.players[0].shotCharge, 0);
+  }
+});
+
+test('power interrupts a held normal charge immediately, even when stock is empty', () => {
+  for (const stock of [0, 3]) for (const side of [0, 1]) {
+    const game = new Game(); game.start();
+    const held = holdRallyCharge(game, side, 0.5);
+    game.players[side].powerCharges = stock;
+    held[side].power = true;
+    game.update(1 / 120, held);
+    assert.equal(game.rally, 1);
+    assert.equal(game.events.at(-1).type, stock ? 'power' : 'hit');
+    assert.equal(game.events.at(-1).charge, 0);
+    assert.equal(game.players[side].hitCharge, 0);
+    game.update(1 / 120);
+    assert.equal(game.rally, 1, 'Releasing the interrupted gesture cannot hit again');
+  }
+});
+
+test('canceling one rally charge preserves the other player and blocks a stale release', () => {
+  const game = new Game(); game.start();
+  const inputs = [{ hit: true }, { hit: true }];
+  holdRallyCharge(game, 0, 0.4, inputs);
+  const otherCharge = game.players[1].hitCharge;
+  game.cancelHitCharges(0);
+  assert.equal(game.players[0].hitCharge, 0);
+  assert.equal(game.players[1].hitCharge, otherCharge);
+  game.update(1 / 120, [{}, { hit: true }]);
+  assert.equal(game.rally, 0);
+  game.cancelHitCharges();
+  assert.ok(game.players.every((p) => p.hitCharge === 0 && !p.hitCharging && p._attackBuffer === 0));
+  game.update(1 / 120);
+  holdRallyCharge(game, 0, 0.1); game.update(1 / 120);
+  assert.equal(game.rally, 1);
+});
+
+test('serving cannot carry the receivers held hit into a charged return', () => {
+  const game = new Game(); game.start();
+  advance(game, 0.7, [{ hit: true }, { hit: true }]);
+  game.update(1 / 120, [{}, { hit: true }]);
+  assert.equal(game.phase, 'playing');
+  advance(game, 0.2, [{}, { hit: true }]);
+  assert.equal(game.players[1].hitCharge, 0);
+  game.update(1 / 120);
+  assert.equal(game.players[1]._attackBuffer, 0);
+  holdRallyCharge(game, 1, 0.1); game.update(1 / 120);
+  assert.equal(game.lastHitter, 1);
 });

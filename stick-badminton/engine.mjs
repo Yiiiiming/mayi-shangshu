@@ -32,6 +32,7 @@ export class Game {
     this.players = [0, 1].map((side) => ({
       x: side ? 835 : 265, y: WORLD.floorY, vx: 0, vy: 0,
       facing: side ? -1 : 1, swing: 0, shot: 'hit',
+      hitCharge: 0, hitCharging: false, shotCharge: 0, _hitBlocked: false, _powerWasDown: false,
       powerCharges: 3, powerProgress: 0,
       color: side ? '#e56047' : '#2364dc',
       _jumpWasDown: false, _jumpBuffer: 0, _attackBuffer: 0,
@@ -75,6 +76,17 @@ export class Game {
     this.serveCharging = false;
     this._serveQueued = false;
     this._serveBlocked = true;
+  }
+
+  /** Drop rally gestures and released swings when input focus is lost. */
+  cancelHitCharges(side) {
+    for (const player of side === undefined ? this.players : [this.players[side]].filter(Boolean)) {
+      player.hitCharge = 0;
+      player.hitCharging = false;
+      player.shotCharge = 0;
+      player._attackBuffer = 0;
+      player._hitBlocked = true;
+    }
   }
 
   /** dt is in seconds. The caller pauses simply by not calling update(). */
@@ -132,6 +144,10 @@ export class Game {
       return;
     }
     if (this.phase !== 'playing') return;
+
+    for (let side = 0; side < 2; side += 1) {
+      this._chargeHit(side, inputs[side] || {}, dt, pressed[side], released[side]);
+    }
 
     // Test contact on both ends of the short physics step. Even a quick power shot
     // remains catchable when the display is rendering at a lower frame rate.
@@ -214,19 +230,11 @@ export class Game {
     player._attackCooldown = Math.max(0, player._attackCooldown - dt);
     player._hitCooldown = Math.max(0, player._hitCooldown - dt);
     player._attackBuffer = Math.max(0, player._attackBuffer - dt);
+    if (player._attackBuffer === 0) player.shotCharge = 0;
     player._jumpBuffer = Math.max(0, player._jumpBuffer - dt);
 
     if (input.jump && !player._jumpWasDown) player._jumpBuffer = 0.13;
     player._jumpWasDown = Boolean(input.jump);
-    if (this.phase === 'playing' && (input.hit || input.power)) {
-      player._requestedShot = input.power && (this.unlimitedPower || player.powerCharges > 0) ? 'power' : 'hit';
-      if (player._attackCooldown <= 0) {
-        player._attackBuffer = 0.18;
-        player.swing = 1;
-        player.shot = player._requestedShot;
-        player._attackCooldown = 0.29;
-      }
-    }
 
     const direction = Number(Boolean(input.right)) - Number(Boolean(input.left));
     player.vx = approach(player.vx, direction * 365, (direction ? 2600 : 3100) * dt);
@@ -254,6 +262,51 @@ export class Game {
     if (player.y >= WORLD.floorY) {
       player.y = WORLD.floorY;
       player.vy = 0;
+    }
+  }
+
+  _chargeHit(side, input, dt, pressed, released) {
+    const player = this.players[side];
+    const powerPressed = Boolean(input.power) && !player._powerWasDown;
+    player._powerWasDown = Boolean(input.power);
+    if (input.power) {
+      // Power remains immediate, including the empty-stock normal fallback.
+      // Discard a pending charge so releasing S/down cannot add a second hit.
+      const interruptedCharge = player.hitCharging;
+      player.hitCharge = 0;
+      player.hitCharging = false;
+      player._hitBlocked = Boolean(input.hit);
+      if (powerPressed || interruptedCharge || player._attackCooldown <= 0) {
+        player._requestedShot = this.unlimitedPower || player.powerCharges > 0 ? 'power' : 'hit';
+        player.shotCharge = 0;
+        player._attackBuffer = 0.18;
+        player.swing = 1;
+        player.shot = player._requestedShot;
+        player._attackCooldown = 0.29;
+      }
+      return;
+    }
+    if (player._hitBlocked) {
+      if (!input.hit) player._hitBlocked = false;
+      return;
+    }
+    if (pressed) {
+      player.hitCharge = 0;
+      player.hitCharging = true;
+      player.shotCharge = 0;
+      player._attackBuffer = 0;
+    }
+    if (player.hitCharging && input.hit) {
+      player.hitCharge = Math.min(1, player.hitCharge + dt / 0.75);
+    } else if (player.hitCharging && released) {
+      player.hitCharging = false;
+      player.shotCharge = player.hitCharge;
+      player.hitCharge = 0;
+      player._requestedShot = 'hit';
+      player._attackBuffer = 0.18;
+      player._attackCooldown = 0.29;
+      player.swing = 1;
+      player.shot = 'hit';
     }
   }
 
@@ -301,7 +354,7 @@ export class Game {
       && (this.unlimitedPower || player.powerCharges > 0);
     let horizontal;
     let vertical;
-    const charge = serving ? this.serveCharge : 0;
+    const charge = serving ? this.serveCharge : attacking ? 0 : player.shotCharge;
     const maximumLift = Math.sqrt(2 * GRAVITY * Math.max(0, shuttle.y - 104));
 
     if (serving) {
@@ -356,14 +409,17 @@ export class Game {
       const liftForWall = (WORLD.floorY - 90 - shuttle.y - 0.5 * GRAVITY * wallTime * wallTime) / wallTime;
       vertical = Math.min(vertical, liftForWall);
     } else {
-      horizontal = 390 + front * 160 + forwardSpeed * 0.38 + incomingSpeed * 0.10;
+      // A quick tap is a short recovery/drop; holding sends the same contact
+      // much deeper. Position and momentum still shape every individual arc.
+      horizontal = 150 + Math.pow(charge, 1.3) * 470
+        + front * 160 + forwardSpeed * 0.38 + incomingSpeed * 0.10;
       vertical = -525 + front * 85 + (height - 75) * 0.95
         + highContact * 180 + incomingFall * 0.09 + player.vy * 0.12 - behind * 55;
     }
 
     // Keep high recovery lobs visible. Normal returns retain their entirely
     // contact-driven arc; an impossibly late low power shot can still net.
-    shuttle.vx = direction * clamp(horizontal, 170, attacking || serving ? 1250 : 950);
+    shuttle.vx = direction * clamp(horizontal, 170, attacking || serving ? 1250 : 850);
     shuttle.vy = clamp(vertical, -maximumLift, 340);
     shuttle.active = true;
     shuttle.trail.length = 0;
@@ -371,10 +427,16 @@ export class Game {
     player.shot = attacking ? 'power' : 'hit';
     player._hitCooldown = 0.23;
     player._attackBuffer = 0;
+    player.hitCharge = 0;
+    player.hitCharging = false;
+    player.shotCharge = 0;
+    player._hitBlocked = this._actionDown[side];
     this.lastHitter = side;
     this._wallSinceHit = false;
     this._crossedNetSinceHit = false;
     if (serving) {
+      // A receiver who held the key during the serve must make a fresh press.
+      this.cancelHitCharges();
       this._serveFlightActive = true;
       this._serveOrigin = side;
       this._serveReachedLine = false;
@@ -403,11 +465,12 @@ export class Game {
     this.message = attacking ? `${NAMES[side]}强力球！` : '看准来球，挥拍！';
     this._emit(serving
       ? { type: 'serve', player: side, charge }
-      : { type: attacking ? 'power' : 'hit', player: side });
+      : { type: attacking ? 'power' : 'hit', player: side, charge });
   }
 
   _awardPoint(winner, reason) {
     if (this.phase !== 'playing') return;
+    this.cancelHitCharges();
     this._serveFlightActive = false;
     this.score[winner] += 1;
     this.server = winner;
@@ -462,6 +525,11 @@ export class Game {
       player._attackCooldown = 0;
       player._hitCooldown = 0;
       player._jumpBuffer = 0;
+      player.hitCharge = 0;
+      player.hitCharging = false;
+      player.shotCharge = 0;
+      player._hitBlocked = this._actionDown[side];
+      player._powerWasDown = false;
     }
     const player = this.players[this.server];
     Object.assign(this.shuttle, { x: player.x + player.facing * 38, y: player.y - 68, vx: 0, vy: 0, active: false });

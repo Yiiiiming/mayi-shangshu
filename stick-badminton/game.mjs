@@ -1,5 +1,6 @@
-import { Game, WORLD } from './engine.mjs?v=match-rules-1';
-import { locales } from './locales.mjs?v=match-rules-1';
+import { Game, WORLD } from './engine.mjs?v=charge-roster-1';
+import { locales } from './locales.mjs?v=charge-roster-1';
+import { CHARACTERS, characterPreview, drawCharacterDetails } from './characters.mjs?v=charge-roster-1';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('game');
@@ -15,6 +16,11 @@ let rulesConfirmed = false;
 let rulesOpen = false;
 let draftRules = { ...game.rules };
 let lastRulesUI = '';
+let charactersConfirmed = false;
+let charactersOpen = false;
+let selectedCharacters = ['classic', 'classic'];
+let draftCharacters = [...selectedCharacters];
+let lastCharactersUI = '';
 let copy = locales.en;
 let names = [copy.blue, copy.red];
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -83,7 +89,7 @@ function chooseLanguage(value) {
   $('live-status').textContent = '';
   lastUI = ''; last = performance.now();
   syncUI();
-  (rulesOpen ? $('rules-confirm') : $('start')).focus({ preventScroll: true });
+  (rulesOpen ? $('rules-confirm') : charactersOpen ? $('characters-confirm') : $('start')).focus({ preventScroll: true });
 }
 function showLanguageChoice() {
   clearInputs();
@@ -97,7 +103,7 @@ $('choose-zh').addEventListener('click', () => chooseLanguage('zh'));
 $('choose-en').addEventListener('click', () => chooseLanguage('en'));
 $('lang-switch').addEventListener('click', showLanguageChoice);
 
-function canPlay() { return languageSelected && rulesConfirmed && !rulesOpen; }
+function canPlay() { return languageSelected && rulesConfirmed && !rulesOpen && charactersConfirmed && !charactersOpen; }
 function serveRuleKey(rules) {
   return rules.allowServeWall ? (rules.requireServiceLine ? 'long' : 'open') : (rules.requireServiceLine ? 'strict' : 'no-wall');
 }
@@ -137,14 +143,51 @@ $('rules-confirm').addEventListener('click', () => {
   if (!languageSelected || !rulesOpen) return;
   game.setRules(draftRules);
   game.reset(); paused = false; clearInputs(); particles = []; transient = ''; deuceUntil = 0;
-  rulesConfirmed = true; rulesOpen = false; lastUI = '';
-  syncUI(); $('start').focus({ preventScroll: true });
+  rulesConfirmed = true; rulesOpen = false; charactersConfirmed = false; charactersOpen = true;
+  draftCharacters = [...selectedCharacters]; lastUI = ''; lastCharactersUI = '';
+  syncUI(); $('characters-confirm').focus({ preventScroll: true });
 });
 $('rules-language').addEventListener('click', () => { if (rulesOpen) showLanguageChoice(); });
 $('rules-edit').addEventListener('click', () => {
   if (!canPlay() || (game.phase !== 'ready' && game.phase !== 'over')) return;
   clearInputs(); draftRules = { ...game.rules }; rulesOpen = true; lastUI = ''; lastRulesUI = '';
   syncUI(); $('rules-confirm').focus({ preventScroll: true });
+});
+
+function syncCharacterChoices() {
+  const stamp = `${language}|${draftCharacters.join(',')}`;
+  if (stamp === lastCharactersUI) return;
+  lastCharactersUI = stamp;
+  for (const side of [0, 1]) for (const character of CHARACTERS) {
+    const suffix = `${side}-${character.id}`;
+    $(`character-${suffix}`).setAttribute('aria-pressed', String(draftCharacters[side] === character.id));
+    $(`character-${suffix}`).setAttribute('aria-label', `${names[side]} · ${character.name[language]} · ${character.description[language]}`);
+    $(`char-name-${suffix}`).textContent = character.name[language];
+    $(`char-desc-${suffix}`).textContent = character.description[language];
+    $(`char-preview-${suffix}`).innerHTML = characterPreview(character.id, colors[side]);
+  }
+}
+for (const side of [0, 1]) for (const character of CHARACTERS) {
+  $(`character-${side}-${character.id}`).addEventListener('click', () => {
+    if (!languageSelected || !charactersOpen || rulesOpen) return;
+    draftCharacters[side] = character.id; syncCharacterChoices();
+  });
+}
+$('characters-confirm').addEventListener('click', () => {
+  if (!languageSelected || !rulesConfirmed || !charactersOpen || rulesOpen) return;
+  selectedCharacters = [...draftCharacters]; charactersConfirmed = true; charactersOpen = false;
+  game.reset(); paused = false; clearInputs(); particles = []; transient = ''; deuceUntil = 0; lastUI = '';
+  syncUI(); $('start').focus({ preventScroll: true });
+});
+$('characters-back').addEventListener('click', () => {
+  if (!languageSelected || !charactersOpen || rulesOpen) return;
+  charactersOpen = false; rulesOpen = true; draftRules = { ...game.rules }; lastRulesUI = '';
+  syncUI(); $('rules-confirm').focus({ preventScroll: true });
+});
+$('characters-edit').addEventListener('click', () => {
+  if (!canPlay() || (game.phase !== 'ready' && game.phase !== 'over')) return;
+  clearInputs(); draftCharacters = [...selectedCharacters]; charactersConfirmed = false; charactersOpen = true; lastCharactersUI = '';
+  syncUI(); $('characters-confirm').focus({ preventScroll: true });
 });
 
 function updateSoundLabel() {
@@ -159,7 +202,7 @@ function toggleSound() {
   if (soundEnabled) sound('hit');
 }
 function clearInputs() {
-  game.cancelServeCharge();
+  game.cancelServeCharge(); game.cancelHitCharges();
   keys.clear(); touchPointers.clear();
   for (const side of touch) for (const action of Object.keys(side)) delete side[action];
   document.querySelectorAll('.pressed').forEach((button) => button.classList.remove('pressed'));
@@ -234,7 +277,10 @@ document.querySelectorAll('[data-action]').forEach((button) => {
   const release = (event) => {
     const pointer = touchPointers.get(event.pointerId);
     if (!pointer) return;
-    if (event.type !== 'pointerup' && pointer.side === game.server && pointer.action === 'hit') game.cancelServeCharge();
+    if (event.type !== 'pointerup' && pointer.action === 'hit') {
+      if (pointer.side === game.server) game.cancelServeCharge();
+      game.cancelHitCharges(pointer.side);
+    }
     touchPointers.delete(event.pointerId);
     const stillHeld = [...touchPointers.values()].some((p) => p.side === pointer.side && p.action === pointer.action);
     touch[pointer.side][pointer.action] = stillHeld;
@@ -255,6 +301,8 @@ function inputs() {
 function syncUI() {
   $('language-screen').hidden = languageSelected;
   $('rules-screen').hidden = !languageSelected || !rulesOpen;
+  $('character-screen').hidden = !languageSelected || !charactersOpen || rulesOpen;
+  if (languageSelected && charactersOpen && !rulesOpen) syncCharacterChoices();
   $('game-shell').hidden = !canPlay();
   $('game-shell').inert = !canPlay();
   if (languageSelected && rulesOpen) syncRuleChoices();
@@ -262,11 +310,23 @@ function syncUI() {
     $('overlay').hidden = true;
     $('serve-power').hidden = true;
     $('deuce-banner').hidden = true;
+    for (const side of [0, 1]) $(`rally-charge-${side}`).hidden = true;
     return;
   }
   const ruleMode = serveRuleKey(game.rules);
   const restricted = ruleMode !== 'open';
   $('rules-edit').hidden = game.phase !== 'ready' && game.phase !== 'over';
+  $('characters-edit').hidden = $('rules-edit').hidden;
+  for (const side of [0, 1]) {
+    const player = game.players[side];
+    const percent = Math.round(player.hitCharge * 100);
+    $(`rally-charge-${side}`).hidden = game.phase !== 'playing' || paused;
+    $(`hit-charge-value-${side}`).textContent = `${percent}%`;
+    $(`hit-charge-fill-${side}`).style.transform = `scaleX(${player.hitCharge})`;
+    $(`hit-charge-meter-${side}`).setAttribute('aria-valuenow', String(percent));
+    $(`hit-charge-meter-${side}`).setAttribute('aria-label', copy.hitChargeMeter(names[side]));
+    $(`hit-charge-label-${side}`).textContent = `P${side + 1} · ${player.hitCharging ? (percent === 100 ? copy.hitChargeFull : copy.hitChargeCharging) : copy.hitChargeIdle}`;
+  }
   $('power-range-near').textContent = game.rules.autoLegalServe && game.rules.requireServiceLine ? copy.pastServiceLine : copy.near;
   $('power-range-far').textContent = !game.rules.allowServeWall ? (game.rules.autoLegalServe ? copy.legalDeep : copy.wallWarning) : copy.wall;
   $('deuce-banner').hidden = !game.unlimitedPower || time >= deuceUntil;
@@ -370,22 +430,19 @@ function drawCourt() {
   line([[91, 390], [1009, 390], [1065, 553], [35, 553], [91, 390]], '#deebca', 3);
   line([[70, 453], [1030, 453]], '#d8e6c3', 2);
   line([[46, 522], [1054, 522]], '#e4edcf', 2);
-  line([[301, 390], [279, 553]], '#d8e6c3', 2);
-  line([[799, 390], [821, 553]], '#d8e6c3', 2);
+  // A service line is one ground marking, anchored to its actual rule
+  // boundary at the players' feet. Highlight the same path, never a second line.
+  const highlightService = game.rules.requireServiceLine || game.autoLegalServeActive;
+  for (const serviceX of [WORLD.serviceLineLeft, WORLD.serviceLineRight]) {
+    const path = [390, WORLD.floorY, 553].map((depth) => [WORLD.netX + (serviceX - WORLD.netX) * (1 + (depth - WORLD.floorY) * .00075), depth]);
+    line(path, highlightService ? '#fff0a8' : '#d8e6c3', highlightService ? 3 : 2);
+    if (highlightService) textLabel(copy.serviceLine, path[2][0], 545, '700 10px sans-serif', '#244e40');
+  }
   line([[550, 390], [550, 553]], '#d8e6c3', 2);
   ctx.save(); ctx.globalAlpha = 0.12;
   textLabel('STICK CLUB', 278, 577, '900 27px sans-serif', '#143c2d');
   textLabel(copy.courtSport, 837, 577, '900 27px sans-serif', '#143c2d');
   ctx.restore();
-  if (game.rules.requireServiceLine || game.autoLegalServeActive) {
-    ctx.save(); ctx.setLineDash([7, 5]);
-    for (let side = 0; side < 2; side++) {
-      const x = side ? WORLD.serviceLineRight : WORLD.serviceLineLeft;
-      line([[x, 395], [x, 526]], '#f8f1bd', 3);
-      textLabel(copy.serviceLine, x, 543, '700 10px sans-serif', '#244e40');
-    }
-    ctx.restore();
-  }
   // Court-side signs, part of the stadium rather than an extra interface.
   roundRect(80, 366, 111, 27, 2, '#e9e9d2');
   textLabel(copy.playForFun, 135, 384, '700 10px sans-serif', '#527661');
@@ -449,6 +506,7 @@ function drawPlayer(player, side) {
   const progress = 1 - player.swing;
   let angle = -0.67;
   if (game.phase === 'serve' && game.server === side && game.serveCharging) angle = -1.15 - game.serveCharge * 1.1;
+  else if (game.phase === 'playing' && player.hitCharging) angle = -1.15 - player.hitCharge * 1.1;
   else if (player.swing > 0) angle = -2.5 + Math.sin(progress * Math.PI * .68) * 3.55;
   if (player.shot === 'power' && player.swing > 0) angle -= .08;
   const hand = [shoulder[0] + dir * Math.cos(angle) * 43, shoulder[1] + Math.sin(angle) * 43];
@@ -466,9 +524,12 @@ function drawPlayer(player, side) {
   ctx.restore(); ctx.beginPath(); ctx.ellipse(0, -13, 14, 22, 0, 0, Math.PI * 2); ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.stroke(); ctx.restore();
   ellipse(head[0], head[1], 16, 17, '#f5efcd');
   ctx.beginPath(); ctx.ellipse(head[0], head[1], 16, 17, 0, 0, Math.PI * 2); ctx.strokeStyle = limb; ctx.lineWidth = 5; ctx.stroke();
-  line([[head[0] - 14, head[1] - 5], [head[0] + 14, head[1] - 5]], color, 5);
-  line([[head[0] - dir * 16, head[1] - 5], [head[0] - dir * 27, head[1] - 1]], color, 3);
+  if (selectedCharacters[side] === 'classic') {
+    line([[head[0] - 14, head[1] - 5], [head[0] + 14, head[1] - 5]], color, 5);
+    line([[head[0] - dir * 16, head[1] - 5], [head[0] - dir * 27, head[1] - 1]], color, 3);
+  }
   ellipse(head[0] + dir * 6, head[1] + 2, 2, 2, limb);
+  drawCharacterDetails(ctx, { id: selectedCharacters[side], x, y, lean, head, shoulder, dir, color, time: reducedMotion ? 0 : time, moving });
   if (game.phase === 'ready') textLabel(`P${side + 1}`, x, WORLD.floorY + 35, '800 12px sans-serif', color);
 }
 
@@ -559,5 +620,5 @@ function frame(now) {
 }
 
 // Read-only snapshot for support and repeatable browser verification.
-window.badminton = Object.freeze({ snapshot: () => ({ language, languageSelected, rulesConfirmed, rulesOpen, rules: { ...game.rules }, phase: game.phase, score: [...game.score], unlimitedPower: game.unlimitedPower, paused, server: game.server, serveCharge: game.serveCharge, serveCharging: game.serveCharging, lastHitter: game.lastHitter, rally: game.rally, longestRally: game.longestRally, players: game.players.map(({ x, y, shot, powerCharges, powerProgress }) => ({ x, y, shot, powerCharges, powerProgress })), shuttle: { x: game.shuttle.x, y: game.shuttle.y, vx: game.shuttle.vx, vy: game.shuttle.vy, active: game.shuttle.active }, winner: game.winner }) });
+window.badminton = Object.freeze({ snapshot: () => ({ language, languageSelected, rulesConfirmed, rulesOpen, charactersConfirmed, charactersOpen, selectedCharacters: [...selectedCharacters], draftCharacters: [...draftCharacters], rules: { ...game.rules }, phase: game.phase, score: [...game.score], unlimitedPower: game.unlimitedPower, paused, server: game.server, serveCharge: game.serveCharge, serveCharging: game.serveCharging, lastHitter: game.lastHitter, rally: game.rally, longestRally: game.longestRally, players: game.players.map(({ x, y, shot, powerCharges, powerProgress, hitCharge, hitCharging, shotCharge }) => ({ x, y, shot, powerCharges, powerProgress, hitCharge, hitCharging, shotCharge })), shuttle: { x: game.shuttle.x, y: game.shuttle.y, vx: game.shuttle.vx, vy: game.shuttle.vy, active: game.shuttle.active }, winner: game.winner }) });
 syncUI(); requestAnimationFrame(frame);
