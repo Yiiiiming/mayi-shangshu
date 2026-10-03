@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 // Deterministic module-level integration: real game/engine with minimal DOM and
 // an explicitly advanced frame clock. This does not launch/control a browser.
 let instance = 0;
-async function setup({ language = 'zh', start = true, storedLanguage = null } = {}) {
+async function setup({ language = 'zh', start = true, confirmRules = true, storedLanguage = null } = {}) {
   const elements = new Map();
   let frameCallback;
   let now = 100;
@@ -50,7 +50,9 @@ async function setup({ language = 'zh', start = true, storedLanguage = null } = 
     setPointerCapture() {}
   }
   class Button extends Element {}
-  const buttonIds = new Set(['start', 'restart', 'pause', 'sound', 'fullscreen', 'choose-zh', 'choose-en', 'lang-switch']);
+  const buttonIds = new Set(['start', 'restart', 'pause', 'sound', 'fullscreen', 'choose-zh', 'choose-en', 'lang-switch',
+    'rule-serve-open', 'rule-serve-no-wall', 'rule-serve-long', 'rule-serve-strict', 'rule-auto-off', 'rule-auto-on',
+    'rule-combo-off', 'rule-combo-on', 'rules-confirm', 'rules-language', 'rules-edit']);
   const get = (id) => {
     if (!elements.has(id)) elements.set(id, buttonIds.has(id) ? new Button() : new Element());
     return elements.get(id);
@@ -80,7 +82,9 @@ async function setup({ language = 'zh', start = true, storedLanguage = null } = 
     ? () => ({ addColorStop() {} }) : obj[key] || (() => {}), set: (obj, key, value) => (obj[key] = value, true) });
   get('game').getContext = () => context;
   const doc = new Surface();
-  Object.assign(doc, { hidden: false, fullscreenEnabled: false, documentElement: new Element(), getElementById: get,
+  // Missing IDs must behave like the real DOM: never invent a node for game
+  // code, or a markup typo can pass tests and crash only in the deployed page.
+  Object.assign(doc, { hidden: false, fullscreenEnabled: false, documentElement: new Element(), getElementById: (id) => elements.get(id) || null,
     createElement: () => new Element(), querySelectorAll: (selector) => {
       if (selector === '[data-action]') return touchButtons;
       const datasetKey = { '[data-i18n]': 'i18n', '[data-i18n-aria]': 'i18nAria', '[data-i18n-title]': 'i18nTitle' }[selector];
@@ -105,6 +109,7 @@ async function setup({ language = 'zh', start = true, storedLanguage = null } = 
   const key = (type, code, extra = {}) => win.dispatch(type, { code, target: get('game'), ...extra });
   const pointer = (type, id = 1, side = 0, action = 'hit') => touchButtons.find((b) => +b.dataset.player === side && b.dataset.action === action).dispatch(type, { pointerId: id });
   if (language) get(`choose-${language}`).dispatch('click');
+  if (language && confirmRules) get('rules-confirm').dispatch('click');
   if (start) get('start').dispatch('click');
   tick(36);
   const text = (element) => [element.textContent, element.innerHTML, ...element.attributes.values(),
@@ -264,12 +269,12 @@ test('E and Slash select ground-level power swings for their own players', async
 const dynamicIds = ['overlay-label', 'overlay-title', 'overlay-copy', 'start', 'start-hint', 'court-status',
   'announcement', 'power-label', 'power-value', 'pause', 'sound', 'fullscreen', 'fullscreen-label', 'live-status',
   'power-stock-0', 'power-stock-1', 'power-count-0', 'power-count-1', 'power-progress-0', 'power-progress-1',
-  'deuce-title', 'deuce-copy'];
+  'deuce-title', 'deuce-copy', 'rules-summary', 'power-range-near', 'power-range-far'];
 function assertEnglish(h, ids = dynamicIds) {
   for (const id of ids) assert.doesNotMatch(h.text(h.get(id)), /\p{Script=Han}/u, `Chinese leaked into #${id}`);
 }
 
-test('every page entry requires a language choice and Space cannot bypass it', async () => {
+test('every page entry requires language then rules confirmation, with no keyboard or hidden-button bypass', async () => {
   for (const storedLanguage of [null, 'zh', 'en']) {
     const h = await setup({ language: null, start: false, storedLanguage });
     assert.equal(h.get('language-screen').hidden, false);
@@ -280,9 +285,162 @@ test('every page entry requires a language choice and Space cannot bypass it', a
     assert.equal(h.get('language-screen').hidden, false);
     h.get('choose-en').dispatch('click'); h.tick();
     assert.equal(h.get('language-screen').hidden, true);
+    assert.equal(h.get('rules-screen').hidden, false);
+    assert.equal(h.state().rulesConfirmed, false);
+    assert.equal(h.get('overlay').hidden, true);
+    h.key('keydown', 'Space'); h.key('keyup', 'Space'); h.tick();
+    h.get('start').dispatch('click'); h.tick();
+    h.pointer('pointerdown'); h.tick(12); h.pointer('pointerup'); h.tick();
+    assert.equal(h.state().phase, 'ready');
+    assert.equal(h.get('rules-screen').hidden, false);
+    h.get('rules-confirm').dispatch('click'); h.tick();
+    assert.equal(h.state().rulesConfirmed, true);
+    assert.equal(h.state().rulesOpen, false);
     assert.equal(h.get('overlay').hidden, false);
+    assert.equal(h.state().phase, 'ready', 'Confirming rules must not auto-start');
     h.get('start').dispatch('click'); h.tick();
     assert.equal(h.state().phase, 'serve');
+  }
+});
+
+const defaultRules = Object.freeze({ allowServeWall: true, requireServiceLine: false, autoLegalServe: false, allowCombo: false });
+const serveChoices = [
+  ['open', true, false], ['no-wall', false, false], ['long', true, true], ['strict', false, true],
+];
+const click = (h, id) => { h.get(id).dispatch('click'); h.tick(); };
+
+test('rules menu starts with unrestricted serves and no automatic assistance or combos', async () => {
+  const h = await setup({ language: 'en', confirmRules: false, start: false });
+  assert.equal(h.state().rulesConfirmed, false);
+  assert.equal(h.state().rulesOpen, true);
+  assert.equal(h.get('rules-screen').hidden, false);
+  assert.equal(h.get('game-shell').hidden, true);
+  assert.equal(h.get('rule-serve-open').attributes.get('aria-pressed'), 'true');
+  assert.equal(h.get('rule-auto-off').attributes.get('aria-pressed'), 'true');
+  assert.equal(h.get('rule-combo-off').attributes.get('aria-pressed'), 'true');
+  assert.equal(h.get('serve-assist-options').hidden, true);
+  click(h, 'rules-confirm');
+  assert.deepEqual(h.state().rules, defaultRules);
+  assert.deepEqual(h.engine.rules, defaultRules);
+  assert.equal(h.get('rules-screen').hidden, true);
+  assert.equal(h.state().phase, 'ready');
+  assert.ok(h.get('rules-summary').textContent.trim());
+  assertEnglish(h);
+});
+
+test('all four serve choices and optional assistance reach the actual game engine', async () => {
+  for (const [choice, allowServeWall, requireServiceLine] of serveChoices) {
+    for (const assisted of choice === 'open' ? [false] : [false, true]) {
+      const h = await setup({ language: 'en', confirmRules: false, start: false });
+      click(h, `rule-serve-${choice}`);
+      for (const [other] of serveChoices) {
+        assert.equal(h.get(`rule-serve-${other}`).attributes.get('aria-pressed'), String(other === choice));
+      }
+      assert.equal(h.get('serve-assist-options').hidden, choice === 'open');
+      if (assisted) click(h, 'rule-auto-on');
+      click(h, 'rule-combo-on');
+      click(h, 'rules-confirm');
+      const expected = { allowServeWall, requireServiceLine, autoLegalServe: assisted, allowCombo: true };
+      assert.deepEqual(h.state().rules, expected);
+      assert.deepEqual(h.engine.rules, expected);
+      click(h, 'start');
+      assert.equal(h.state().phase, 'serve');
+      assert.deepEqual(h.engine.rules, expected, 'Starting must retain the confirmed options');
+      assertEnglish(h);
+    }
+  }
+});
+
+test('removing serve restrictions clears hidden automatic assistance and returning from language cannot bypass confirmation', async () => {
+  const h = await setup({ confirmRules: false, start: false });
+  click(h, 'rule-serve-strict'); click(h, 'rule-auto-on');
+  assert.equal(h.get('rule-auto-on').attributes.get('aria-pressed'), 'true');
+  click(h, 'rule-serve-open');
+  assert.equal(h.get('serve-assist-options').hidden, true);
+  click(h, 'rule-serve-long');
+  assert.equal(h.get('rule-auto-off').attributes.get('aria-pressed'), 'true');
+  click(h, 'rules-language');
+  assert.equal(h.get('language-screen').hidden, false);
+  assert.equal(h.get('rules-screen').hidden, true);
+  click(h, 'rules-confirm');
+  assert.equal(h.state().rulesConfirmed, false);
+  click(h, 'choose-en');
+  assert.equal(h.get('rules-screen').hidden, false);
+  assert.equal(h.get('overlay').hidden, true);
+  assertEnglish(h, ['rules-summary']);
+  click(h, 'rules-confirm');
+  assert.equal(h.state().rules.autoLegalServe, false);
+});
+
+test('confirmed rules survive restart and an in-match language switch; rules cannot change mid-match', async () => {
+  const h = await setup({ language: 'en', confirmRules: false, start: false });
+  click(h, 'rule-serve-strict'); click(h, 'rule-auto-on'); click(h, 'rule-combo-on'); click(h, 'rules-confirm');
+  const expected = { allowServeWall: false, requireServiceLine: true, autoLegalServe: true, allowCombo: true };
+  assert.equal(h.get('rules-edit').hidden, false);
+  click(h, 'start'); h.tick(36);
+  assert.equal(h.get('rules-edit').hidden, true);
+  click(h, 'rules-edit');
+  assert.equal(h.state().rulesOpen, false);
+  click(h, 'rule-serve-open'); click(h, 'rule-combo-off'); click(h, 'rules-confirm');
+  assert.deepEqual(h.engine.rules, expected, 'Hidden setup buttons cannot change a running match');
+  h.key('keydown', 'KeyS'); h.tick(30); h.key('keyup', 'KeyS'); h.tick(3);
+  assert.equal(h.state().phase, 'playing');
+  click(h, 'lang-switch');
+  const frozen = h.state().shuttle;
+  click(h, 'choose-zh'); h.tick(12);
+  assert.equal(h.state().rulesConfirmed, true);
+  assert.equal(h.state().rulesOpen, false);
+  assert.equal(h.get('rules-screen').hidden, true);
+  assert.equal(h.state().paused, true);
+  assert.deepEqual(h.state().rules, expected);
+  assert.deepEqual(h.state().shuttle, frozen);
+  click(h, 'start');
+  assert.equal(h.state().paused, false);
+  click(h, 'restart');
+  assert.equal(h.state().phase, 'ready');
+  assert.deepEqual(h.engine.rules, expected);
+  assert.equal(h.get('rules-edit').hidden, false);
+  click(h, 'rules-edit');
+  assert.equal(h.state().rulesOpen, true);
+  click(h, 'rule-serve-open'); click(h, 'rule-combo-off'); click(h, 'rules-confirm');
+  assert.deepEqual(h.engine.rules, defaultRules);
+});
+
+test('editing rules after match end confirms a fresh ready screen without auto-starting', async () => {
+  const h = await setup({ language: 'en' });
+  h.engine.target = 1;
+  scorePoint(h, 0); scorePoint(h, 0);
+  assert.equal(h.state().phase, 'over');
+  assert.equal(h.get('rules-edit').hidden, false);
+  click(h, 'rules-edit');
+  assert.equal(h.state().rulesOpen, true);
+  click(h, 'rule-serve-no-wall'); click(h, 'rules-confirm');
+  assert.equal(h.state().phase, 'ready');
+  assert.deepEqual(h.state().score, [0, 0]);
+  assert.equal(h.state().rules.allowServeWall, false);
+  assert.equal(h.get('overlay').hidden, false);
+  click(h, 'start');
+  assert.equal(h.state().phase, 'serve');
+  assert.equal(h.engine.rules.allowServeWall, false);
+});
+
+test('serve faults show their actual reason in both languages', async () => {
+  for (const language of ['en', 'zh']) {
+    for (const reason of ['serve-wall', 'serve-short']) {
+      const h = await setup({ language });
+      // The engine suite exercises real fault trajectories. This UI fixture
+      // supplies each real reason to verify the score and localized feedback.
+      h.key('keydown', 'KeyS'); h.tick(6); h.key('keyup', 'KeyS'); h.tick();
+      assert.equal(h.state().phase, 'playing');
+      h.engine._awardPoint(1, reason); h.tick();
+      assert.deepEqual(h.state().score, [0, 1]);
+      const announcement = h.text(h.get('announcement'));
+      assert.doesNotMatch(announcement, /serve-wall|serve-short/);
+      if (language === 'en') {
+        assertEnglish(h);
+        assert.match(announcement, reason === 'serve-wall' ? /wall/i : /short|line/i);
+      } else assert.match(announcement, reason === 'serve-wall' ? /墙/ : /线|短/);
+    }
   }
 });
 
@@ -316,7 +474,10 @@ test('English remains English through start, charge, pause, points and a complet
   assertEnglish(h);
   assert.ok(h.staticNodes.length > 15, 'Actual static localization bindings were not modeled');
   for (const node of h.staticNodes) {
-    if (node.dataset.i18n) assert.doesNotMatch(node.textContent, /\p{Script=Han}/u, `Chinese static label: ${node.dataset.i18n}`);
+    if (node.dataset.i18n) {
+      assert.ok(node.textContent.trim() && node.textContent !== 'undefined', `Missing translation: ${node.dataset.i18n}`);
+      assert.doesNotMatch(node.textContent, /\p{Script=Han}/u, `Chinese static label: ${node.dataset.i18n}`);
+    }
     if (node.dataset.i18nAria) assert.doesNotMatch(node.attributes.get('aria-label'), /\p{Script=Han}/u);
     if (node.dataset.i18nTitle) assert.doesNotMatch(node.attributes.get('title'), /\p{Script=Han}/u);
   }

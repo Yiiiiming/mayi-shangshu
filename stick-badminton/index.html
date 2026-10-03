@@ -7,7 +7,7 @@
   <meta id="page-description" name="description" content="Stick Badminton / 火柴人羽毛球. Choose English or 中文 and play together on one keyboard.">
   <title>Stick Badminton / 火柴人羽毛球</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=power-count-1">
+  <link rel="stylesheet" href="style.css?v=match-rules-1">
 </head>
 <body>
   <section id="language-screen" class="language-screen" aria-labelledby="language-title">
@@ -23,6 +23,35 @@
       </div>
     </div>
   </section>
+  <section id="rules-screen" class="rules-screen" aria-labelledby="rules-title" hidden>
+    <div class="rules-card">
+      <div class="rules-card-top"><span class="language-brand">STICK CLUB / 02</span><button id="rules-language" class="rules-back" data-i18n="rulesLanguage">更换语言</button></div>
+      <h1 id="rules-title" data-i18n="rulesTitle">这场，按你的规则打。</h1>
+      <p class="rules-intro" data-i18n="rulesIntro">默认选项已选好，也可以自定规则。双方使用同一套规则。</p>
+      <fieldset><legend data-i18n="rulesServeTitle">1. 发球可以怎样打？</legend>
+        <div class="rule-options serve-options">
+          <button id="rule-serve-open" type="button" aria-pressed="true"><strong data-i18n="ruleServeOpen">可以碰墙 · 不限发球线</strong><span data-i18n="ruleServeOpenDetail">自由发球（默认）</span></button>
+          <button id="rule-serve-no-wall" type="button" aria-pressed="false"><strong data-i18n="ruleServeNoWall">不能碰墙 · 不限发球线</strong><span data-i18n="ruleServeNoWallDetail">发球碰墙即失分</span></button>
+          <button id="rule-serve-long" type="button" aria-pressed="false"><strong data-i18n="ruleServeLong">可以碰墙 · 须越发球线</strong><span data-i18n="ruleServeLongDetail">球须到达对方发球线，允许反弹</span></button>
+          <button id="rule-serve-strict" type="button" aria-pressed="false"><strong data-i18n="ruleServeStrict">不能碰墙 · 须越发球线</strong><span data-i18n="ruleServeStrictDetail">同时启用两项限制</span></button>
+        </div>
+      </fieldset>
+      <fieldset id="serve-assist-options" hidden><legend data-i18n="rulesAssistTitle">2. 发球限制如何生效？</legend>
+        <div class="rule-options">
+          <button id="rule-auto-off" type="button" aria-pressed="true"><strong data-i18n="ruleAutoOff">手动控制，违规失分（默认）</strong><span data-i18n="ruleAutoOffDetail">保持原有球路；违规时对手得 1 分。</span></button>
+          <button id="rule-auto-on" type="button" aria-pressed="false"><strong data-i18n="ruleAutoOn">自动合规</strong><span data-i18n="ruleAutoOnDetail">调整发球站位与力度，满足所选限制。</span></button>
+        </div>
+      </fieldset>
+      <fieldset><legend data-i18n="rulesComboTitle">3. 允许自己半场连击吗？</legend>
+        <div class="rule-options">
+          <button id="rule-combo-off" type="button" aria-pressed="true"><strong data-i18n="ruleComboOff">不允许（默认）</strong><span data-i18n="ruleComboOffDetail">球未越网前，自己只能击打一次。</span></button>
+          <button id="rule-combo-on" type="button" aria-pressed="false"><strong data-i18n="ruleComboOn">允许连击</strong><span data-i18n="ruleComboOnDetail">球未越网且仍在自己半场，可以再次击打。</span></button>
+        </div>
+      </fieldset>
+      <p class="rules-note" data-i18n="rulesNote">发球限制到对方首次回击为止；对方提前接球视为接受发球。球越网后碰墙返回，仍可救球。自动合规只调整最初发球，后续连击仍按规则判定。</p>
+      <button id="rules-confirm" class="primary"><b data-i18n="rulesConfirm">确认规则，进入球场</b><span aria-hidden="true">↗</span></button>
+    </div>
+  </section>
   <main id="game-shell" class="shell" hidden inert>
     <header class="topbar">
       <a class="brand" href="./" data-i18n-aria="home" aria-label="火柴人羽毛球首页"><span class="brand-mark" data-i18n="brandMark">羽</span><span>STICK CLUB<small data-i18n="club">街机运动俱乐部 / 01</small></span></a>
@@ -36,6 +65,7 @@
         <button id="fullscreen" class="tool" data-i18n-title="fullscreenTitle" title="全屏游戏"><b id="fullscreen-label">全屏</b> <span>⛶</span></button>
       </div>
     </section>
+    <div class="rules-strip"><p id="rules-summary"></p><button id="rules-edit" data-i18n="rulesEdit">修改规则</button></div>
     <section id="arena" class="arena" data-i18n-aria="arena" aria-label="双人羽毛球游戏">
       <canvas id="game" width="1100" height="600" tabindex="0" data-i18n="canvasFallback" data-i18n-aria="canvas" aria-label="羽毛球球场。左方 A D 移动、W 跳跃、S 挥拍、E 大力击球；右方方向键移动跳跃和挥拍、斜杠键大力击球。">你的浏览器不支持 Canvas，请使用新版 Chrome、Edge 或 Safari。</canvas>
       <div class="scoreboard" data-i18n-aria="scoreboard" aria-label="比分">
@@ -51,7 +81,7 @@
       <div id="serve-power" class="serve-power" hidden>
         <div class="power-caption"><span id="power-label">按住蓄力 · 松开发球</span><strong id="power-value">0%</strong></div>
         <div id="power-meter" class="power-meter" role="meter" data-i18n-aria="powerMeter" aria-label="发球力量" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="power-fill"></span></div>
-        <div class="power-range"><span data-i18n="near">网前</span><span data-i18n="wall">撞墙</span></div>
+        <div class="power-range"><span id="power-range-near">网前</span><span id="power-range-far">撞墙</span></div>
       </div>
       <div id="deuce-banner" class="deuce-banner" hidden>
         <div id="deuce-card" class="deuce-card">
@@ -82,10 +112,10 @@
       <div class="touch-side p1"><button data-player="0" data-action="left" aria-label="蓝方向左">←</button><button data-player="0" data-action="right" aria-label="蓝方向右">→</button><button data-player="0" data-action="jump" aria-label="蓝方跳跃">跳</button><button data-player="0" data-action="hit" aria-label="蓝方挥拍">挥</button><button data-player="0" data-action="power" aria-label="蓝方大力击球">力</button></div>
       <div class="touch-side p2"><button data-player="1" data-action="left" aria-label="红方向左">←</button><button data-player="1" data-action="right" aria-label="红方向右">→</button><button data-player="1" data-action="jump" aria-label="红方跳跃">跳</button><button data-player="1" data-action="hit" aria-label="红方挥拍">挥</button><button data-player="1" data-action="power" aria-label="红方大力击球">力</button></div>
     </div>
-    <footer><p><span class="tip-label" data-i18n="tip">小提示</span> <span data-i18n="tipCopy">发球轻点到网前，蓄满冲后墙；蓝方 E、红方 / 大力击球。</span><span class="alias" data-i18n="alias">F / K 也可蓄力。</span></p><div><span><kbd>P</kbd> <span data-i18n="pause">暂停</span></span><button id="restart" data-i18n="restart">重新开局 ↻</button></div></footer>
+    <footer><p><span class="tip-label" data-i18n="tip">小提示</span> <span data-i18n="tipCopy">按住挥拍蓄力，松开发球；蓝方 E、红方 / 大力击球。</span><span class="alias" data-i18n="alias">F / K 也可蓄力。</span></p><div><span><kbd>P</kbd> <span data-i18n="pause">暂停</span></span><button id="restart" data-i18n="restart">重新开局 ↻</button></div></footer>
     <p id="live-status" class="sr-only" aria-live="polite"></p>
   </main>
   <noscript><p class="noscript"><span lang="zh-CN">请开启 JavaScript 来玩火柴人羽毛球。</span><br><span lang="en">Please enable JavaScript to play Stick Badminton.</span></p></noscript>
-  <script type="module" src="game.mjs?v=power-count-1"></script>
+  <script type="module" src="game.mjs?v=match-rules-1"></script>
 </body>
 </html>

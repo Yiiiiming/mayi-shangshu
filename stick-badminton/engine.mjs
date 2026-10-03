@@ -1,5 +1,7 @@
 /** Deterministic, dependency-free physics for a two-player arcade badminton court. */
-export const WORLD = Object.freeze({ width: 1100, height: 600, floorY: 500, netX: 550, netTop: 315, wallLeft: 28, wallRight: 1072, wallTop: 90 });
+export const WORLD = Object.freeze({ width: 1100, height: 600, floorY: 500, netX: 550, netTop: 315, wallLeft: 28, wallRight: 1072, wallTop: 90, serviceLineLeft: 300, serviceLineRight: 800 });
+
+export const DEFAULT_RULES = Object.freeze({ allowServeWall: true, requireServiceLine: false, autoLegalServe: false, allowCombo: false });
 
 const GRAVITY = 680;
 const PLAYER_GRAVITY = 1800;
@@ -8,9 +10,22 @@ const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const approach = (value, target, amount) => value < target ? Math.min(value + amount, target) : Math.max(value - amount, target);
 
 export class Game {
-  constructor({ target = 11 } = {}) {
+  constructor({ target = 11, rules = {} } = {}) {
     this.target = Number.isFinite(target) ? Math.max(1, Math.floor(target)) : 11;
+    this.setRules(rules);
     this.reset();
+  }
+
+  setRules(rules = {}) {
+    this.rules = Object.freeze(Object.fromEntries(Object.entries(DEFAULT_RULES).map(([key, value]) =>
+      [key, typeof rules?.[key] === 'boolean' ? rules[key] : value])));
+    return this.rules;
+  }
+
+  get serveFlightActive() { return this._serveFlightActive; }
+  get serveReachedLine() { return this._serveReachedLine; }
+  get autoLegalServeActive() {
+    return this.rules.autoLegalServe && (!this.rules.allowServeWall || this.rules.requireServiceLine);
   }
 
   reset() {
@@ -43,6 +58,10 @@ export class Game {
     this.events = [];
     this._trailClock = 0;
     this._wallSinceHit = false;
+    this._crossedNetSinceHit = false;
+    this._serveFlightActive = false;
+    this._serveOrigin = null;
+    this._serveReachedLine = false;
   }
 
   start() {
@@ -138,7 +157,21 @@ export class Game {
         shuttle.vy = Math.max(95, shuttle.vy * 0.3);
         this.pointReason = '下网';
         this._emit({ type: 'net', player: this.lastHitter });
+      } else {
+        this._crossedNetSinceHit = true;
       }
+    }
+
+    if (this._serveFlightActive && (this._serveOrigin === 0
+      ? shuttle.x >= WORLD.serviceLineRight : shuttle.x <= WORLD.serviceLineLeft)) {
+      this._serveReachedLine = true;
+    }
+
+    const hitBackWall = (shuttle.x < WORLD.wallLeft && shuttle.vx < 0)
+      || (shuttle.x > WORLD.wallRight && shuttle.vx > 0);
+    if (hitBackWall && this._serveFlightActive && !this.rules.allowServeWall) {
+      this._awardPoint(1 - this._serveOrigin, 'serve-wall');
+      return;
     }
 
     // The back walls keep deep shots alive. Reflect the small overshoot as
@@ -166,7 +199,12 @@ export class Game {
     if (shuttle.y >= WORLD.floorY - 4) {
       shuttle.y = WORLD.floorY - 4;
       const landedOn = shuttle.x < WORLD.netX ? 0 : 1;
-      this._awardPoint(1 - landedOn, this.pointReason || '落地得分');
+      if (this._serveFlightActive && this.rules.requireServiceLine && !this._serveReachedLine
+        && landedOn !== this._serveOrigin) {
+        this._awardPoint(1 - this._serveOrigin, 'serve-short');
+      } else {
+        this._awardPoint(1 - landedOn, this.pointReason || '落地得分');
+      }
     }
   }
 
@@ -193,8 +231,15 @@ export class Game {
     const direction = Number(Boolean(input.right)) - Number(Boolean(input.left));
     player.vx = approach(player.vx, direction * 365, (direction ? 2600 : 3100) * dt);
     player.x += player.vx * dt;
-    const minX = side ? WORLD.netX + 37 : 62;
-    const maxX = side ? WORLD.width - 62 : WORLD.netX - 37;
+    let minX = side ? WORLD.netX + 37 : 62;
+    let maxX = side ? WORLD.width - 62 : WORLD.netX - 37;
+    // Automatic serves use a visible, physically feasible arc. Holding the
+    // server behind the service line avoids an impossible ground-level launch
+    // immediately next to the net. Normal rallies and manual serves stay free.
+    if (this.phase === 'serve' && side === this.server && this.autoLegalServeActive) {
+      if (side === 0) maxX = WORLD.serviceLineLeft;
+      else minX = WORLD.serviceLineRight;
+    }
     if (player.x < minX || player.x > maxX) {
       player.x = clamp(player.x, minX, maxX);
       player.vx = 0;
@@ -215,8 +260,13 @@ export class Game {
   _tryHits() {
     for (let side = 0; side < 2; side += 1) {
       const player = this.players[side];
-      if (player._attackBuffer <= 0 || player._hitCooldown > 0
-        || (this.lastHitter === side && !this._wallSinceHit)) continue;
+      if (player._attackBuffer <= 0 || player._hitCooldown > 0) continue;
+      if (this.lastHitter === side) {
+        const onOwnSide = side === 0 ? this.shuttle.x < WORLD.netX : this.shuttle.x > WORLD.netX;
+        const wallSave = this._wallSinceHit && this._crossedNetSinceHit;
+        const combo = this.rules.allowCombo && !this._crossedNetSinceHit;
+        if (!onOwnSide || (!wallSave && !combo)) continue;
+      }
       if (side === 0 ? this.shuttle.x > WORLD.netX + 5 : this.shuttle.x < WORLD.netX - 5) continue;
       const dx = (this.shuttle.x - (player.x + player.facing * 25)) / 113;
       const dy = (this.shuttle.y - (player.y - 72)) / 114;
@@ -231,6 +281,15 @@ export class Game {
     const player = this.players[side];
     const shuttle = this.shuttle;
     const direction = side === 0 ? 1 : -1;
+    if (serving && this.autoLegalServeActive) {
+      const safeX = side === 0
+        ? clamp(player.x, 62, WORLD.serviceLineLeft)
+        : clamp(player.x, WORLD.serviceLineRight, WORLD.width - 62);
+      if (safeX !== player.x) player.vx = 0;
+      player.x = safeX;
+      shuttle.x = player.x + direction * 38;
+      shuttle.y = player.y - 68;
+    }
     const height = player.y - shuttle.y;
     const front = clamp(((shuttle.x - player.x) * direction - 25) / 100, -1.15, 1.15);
     const behind = Math.max(0, -front);
@@ -251,6 +310,26 @@ export class Game {
       // useful for a conventional deep serve.
       horizontal = 170 + Math.pow(charge, 2.5) * 730 + forwardSpeed * 0.08;
       vertical = -600 + charge * 20 + player.vy * 0.07;
+      if (this.autoLegalServeActive) {
+        // Choose a legal landing interval, then solve the exact ballistic arc.
+        // With walls allowed, the far end deliberately reaches the wall; the
+        // line requirement is fulfilled on its outward flight before rebound.
+        const nearTarget = this.rules.requireServiceLine
+          ? WORLD.serviceLineRight + 18 : WORLD.netX + 120;
+        const farTarget = this.rules.allowServeWall ? WORLD.wallRight + 180 : WORLD.wallRight - 28;
+        const targetFromLeft = nearTarget + (farTarget - nearTarget) * charge;
+        const targetX = side === 0 ? targetFromLeft : WORLD.width - targetFromLeft;
+        const landingY = WORLD.floorY - 4;
+        const lift = Math.sqrt(2 * GRAVITY * Math.max(0, shuttle.y - 140));
+        let flightTime = (lift + Math.sqrt(lift * lift + 2 * GRAVITY * (landingY - shuttle.y))) / GRAVITY;
+        const netFraction = (WORLD.netX - shuttle.x) / (targetX - shuttle.x);
+        const clearance = WORLD.netTop - 20;
+        const netTimeSquared = 2 * (shuttle.y + (landingY - shuttle.y) * netFraction - clearance)
+          / (GRAVITY * netFraction * (1 - netFraction));
+        flightTime = Math.max(flightTime, Math.sqrt(Math.max(0, netTimeSquared)) * 1.02);
+        horizontal = Math.abs(targetX - shuttle.x) / flightTime;
+        vertical = (landingY - shuttle.y - 0.5 * GRAVITY * flightTime * flightTime) / flightTime;
+      }
     } else if (attacking) {
       // Power is an offensive drive/clear from either the ground or the air.
       // Contact and running momentum still change its speed and natural arc.
@@ -294,6 +373,16 @@ export class Game {
     player._attackBuffer = 0;
     this.lastHitter = side;
     this._wallSinceHit = false;
+    this._crossedNetSinceHit = false;
+    if (serving) {
+      this._serveFlightActive = true;
+      this._serveOrigin = side;
+      this._serveReachedLine = false;
+    } else if (this._serveFlightActive && side !== this._serveOrigin) {
+      // An opponent may return a serve early. The receiving contact starts
+      // the rally; the server's own combo does not erase serve restrictions.
+      this._serveFlightActive = false;
+    }
     this.phase = 'playing';
     this.serveCharge = 0;
     this.serveCharging = false;
@@ -319,6 +408,7 @@ export class Game {
 
   _awardPoint(winner, reason) {
     if (this.phase !== 'playing') return;
+    this._serveFlightActive = false;
     this.score[winner] += 1;
     this.server = winner;
     this.shuttle.active = false;
@@ -350,6 +440,10 @@ export class Game {
     this.rally = 0;
     this.lastHitter = null;
     this._wallSinceHit = false;
+    this._crossedNetSinceHit = false;
+    this._serveFlightActive = false;
+    this._serveOrigin = null;
+    this._serveReachedLine = false;
     this.pointTimer = 0;
     this.serveTimer = 0.48;
     this.serveCharge = 0;

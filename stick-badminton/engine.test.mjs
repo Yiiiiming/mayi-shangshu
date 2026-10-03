@@ -682,3 +682,231 @@ test('reset and a new match restore three charges and leave unlimited mode', () 
     assert.equal(game.events.filter(({ type }) => type === 'unlimited-power').length, 0);
   }
 });
+
+function launchConfiguredServe({ side = 0, charge = 0, rules = {}, x = 265, y = 500, vx = 0, vy = 0 } = {}) {
+  const game = new Game({ rules });
+  game.start();
+  game.server = side;
+  const direction = side === 0 ? 1 : -1;
+  const player = game.players[side];
+  Object.assign(player, { x: side === 0 ? x : WORLD.width - x, y, vx: vx * direction, vy });
+  Object.assign(game.shuttle, { x: player.x + 38 * direction, y: y - 68 });
+  game.serveCharge = charge;
+  game._strike(side, true);
+  return game;
+}
+
+function finishFlight(game) {
+  let apex = game.shuttle.y;
+  for (let frame = 0; frame < 720 && game.phase === 'playing'; frame += 1) {
+    game.update(1 / 120);
+    apex = Math.min(apex, game.shuttle.y);
+  }
+  assert.equal(game.phase, 'point', 'unreturned serve should finish as a single point');
+  return apex;
+}
+
+test('match rules have explicit defaults, normalized values, and survive reset and new matches', () => {
+  const defaults = { allowServeWall: true, requireServiceLine: false, autoLegalServe: false, allowCombo: false };
+  const game = new Game();
+  assert.deepEqual(game.rules, defaults);
+  assert.equal(game.autoLegalServeActive, false);
+  assert.equal(game.serveFlightActive, false);
+  assert.deepEqual(game.setRules({ allowServeWall: false, requireServiceLine: true, autoLegalServe: true, allowCombo: true }),
+    { allowServeWall: false, requireServiceLine: true, autoLegalServe: true, allowCombo: true });
+  const rules = game.rules;
+  assert.ok(Object.isFrozen(rules));
+  game.start();
+  serve(game);
+  assert.equal(game.serveFlightActive, true);
+  game.reset();
+  assert.equal(game.rules, rules);
+  assert.equal(game.serveFlightActive, false);
+  assert.equal(game.serveReachedLine, false);
+  game.start();
+  assert.equal(game.rules, rules);
+  assert.equal(game.autoLegalServeActive, true);
+  assert.deepEqual(game.setRules({ allowServeWall: 'false', allowCombo: 1, requireServiceLine: null }), defaults);
+  assert.deepEqual(game.setRules(null), defaults);
+});
+
+test('all four manual serve rule combinations award exactly one point for a short or wall serve on either side', () => {
+  for (const side of [0, 1]) for (const allowServeWall of [false, true]) for (const requireServiceLine of [false, true]) {
+    const rules = { allowServeWall, requireServiceLine };
+    for (const charge of [0, 1]) {
+      const game = launchConfiguredServe({ side, charge, rules });
+      finishFlight(game);
+      const reason = charge === 1 && !allowServeWall ? 'serve-wall'
+        : charge === 0 && requireServiceLine ? 'serve-short' : '落地得分';
+      if (reason.startsWith('serve-')) assert.equal(game.pointReason, reason, JSON.stringify({ side, charge, rules }));
+      else assert.ok(['落地得分', '下网'].includes(game.pointReason), JSON.stringify({ side, charge, rules }));
+      assert.equal(game.score[reason.startsWith('serve-') ? 1 - side : side], 1);
+      assert.equal(game.score[0] + game.score[1], 1);
+      assert.equal(game.events.filter((event) => event.type === 'point').length, 1);
+      assert.equal(game.serveFlightActive, false);
+    }
+    const deepServe = launchConfiguredServe({ side, charge: 0.5, rules });
+    finishFlight(deepServe);
+    assert.equal(deepServe.score[side], 1, 'a medium-charge deep serve meets all four rule variants');
+    assert.equal(deepServe.events.some((event) => event.type === 'wall'), false);
+  }
+});
+
+test('manual rule restrictions and automatic mode with no restrictions preserve the original launch physics', () => {
+  for (const side of [0, 1]) for (const charge of [0, 0.25, 0.5, 1]) {
+    const baseline = launchConfiguredServe({ side, charge, x: 470, vx: 200, y: 400, vy: -200 });
+    for (const rules of [
+      { allowServeWall: false }, { requireServiceLine: true },
+      { allowServeWall: false, requireServiceLine: true }, { autoLegalServe: true },
+    ]) {
+      const game = launchConfiguredServe({ side, charge, rules, x: 470, vx: 200, y: 400, vy: -200 });
+      assert.deepEqual(game.shuttle, baseline.shuttle);
+      assert.equal(game.players[side].x, baseline.players[side].x);
+    }
+  }
+});
+
+test('automatic serve trajectories satisfy each restricted mode from every legal position, jump height, momentum, and charge', () => {
+  let simulations = 0;
+  for (const side of [0, 1]) for (const restriction of [
+    { allowServeWall: false }, { requireServiceLine: true }, { allowServeWall: false, requireServiceLine: true },
+  ]) for (const x of [62, 150, 265, 300, 450, 513]) for (const y of [500, 435, 375.3])
+    for (const [vx, vy] of [[-365, -670], [0, 0], [365, 670]]) for (const charge of [0, 0.25, 0.5, 0.75, 1]) {
+      const game = launchConfiguredServe({ side, charge, x, y, vx, vy, rules: { ...restriction, autoLegalServe: true } });
+      const context = JSON.stringify({ side, restriction, x, y, vx, vy, charge });
+      assert.ok(side === 0 ? game.players[side].x <= WORLD.serviceLineLeft : game.players[side].x >= WORLD.serviceLineRight, context);
+      const apex = finishFlight(game);
+      assert.ok(apex >= 103.9, `serve arc must remain visible: ${apex}, ${context}`);
+      assert.equal(game.score[side], 1, context);
+      assert.equal(game.events.some((event) => event.type === 'net'), false, context);
+      assert.ok(!game.pointReason.startsWith('serve-'), context);
+      if (restriction.allowServeWall === false) assert.equal(game.events.some((event) => event.type === 'wall'), false, context);
+      if (restriction.requireServiceLine) assert.equal(game.serveReachedLine, true, context);
+      simulations += 1;
+    }
+  assert.equal(simulations, 1620);
+});
+
+test('automatic serving keeps a meaningful charge range and only constrains the server until the serve launches', () => {
+  for (const side of [0, 1]) for (const rules of [
+    { allowServeWall: false, autoLegalServe: true },
+    { requireServiceLine: true, autoLegalServe: true },
+    { allowServeWall: false, requireServiceLine: true, autoLegalServe: true },
+  ]) {
+    const tap = launchConfiguredServe({ side, rules, charge: 0 });
+    const full = launchConfiguredServe({ side, rules, charge: 1 });
+    assert.ok(Math.abs(full.shuttle.vx) > Math.abs(tap.shuttle.vx) + 100);
+    finishFlight(tap);
+    finishFlight(full);
+    if (rules.allowServeWall !== false) assert.ok(full.events.some((event) => event.type === 'wall'));
+    const game = new Game({ rules });
+    game.start();
+    game.server = side;
+    const forward = side === 0 ? { right: true } : { left: true };
+    const inputs = [{}, {}];
+    inputs[side] = forward;
+    advance(game, 2, inputs);
+    assert.equal(game.players[side].x, side === 0 ? WORLD.serviceLineLeft : WORLD.serviceLineRight);
+    const otherSide = 1 - side;
+    assert.equal(game.players[otherSide].x, otherSide === 0 ? 265 : 835);
+    game._strike(side, true);
+    advance(game, 0.3, inputs);
+    assert.ok(side === 0 ? game.players[side].x > WORLD.serviceLineLeft : game.players[side].x < WORLD.serviceLineRight);
+  }
+});
+
+test('reaching the service line counts even when the unreturned serve rebounds short of that line', () => {
+  for (const side of [0, 1]) {
+    const game = launchConfiguredServe({ side, charge: 1, rules: { requireServiceLine: true } });
+    for (let frame = 0; frame < 600 && !game.events.some((event) => event.type === 'wall'); frame += 1) game.update(1 / 120);
+    assert.equal(game.serveReachedLine, true);
+    Object.assign(game.shuttle, { x: side === 0 ? 700 : 400, y: 494, vx: 0, vy: 200 });
+    game.update(1 / 60);
+    assert.equal(game.score[side], 1);
+    assert.equal(game.pointReason, '落地得分');
+  }
+});
+
+test('an early receiving contact ends serve restrictions and later rally wall rebounds remain legal', () => {
+  for (const side of [0, 1]) {
+    const receiver = 1 - side;
+    const game = launchConfiguredServe({ side, charge: 0, rules: { allowServeWall: false, requireServiceLine: true } });
+    const player = game.players[receiver];
+    player.x = receiver === 0 ? 450 : 650;
+    player._attackBuffer = 0.18;
+    Object.assign(game.shuttle, { x: player.x + player.facing * 25, y: 410, vx: 0, vy: 0 });
+    game._tryHits();
+    assert.equal(game.lastHitter, receiver);
+    assert.equal(game.serveReachedLine, false);
+    assert.equal(game.serveFlightActive, false);
+    Object.assign(game.shuttle, { x: 1070, y: 240, vx: 900, vy: 0 });
+    game.update(1 / 60);
+    assert.equal(game.phase, 'playing');
+    assert.deepEqual(game.score, [0, 0]);
+    assert.ok(game.events.some((event) => event.type === 'wall'));
+  }
+});
+
+test('combo selection governs repeat contact before a legal net crossing, respecting the same contact cooldown', () => {
+  for (const side of [0, 1]) for (const allowCombo of [false, true]) {
+    const game = launchConfiguredServe({ side, rules: { allowCombo } });
+    const player = game.players[side];
+    Object.assign(game.shuttle, { x: player.x + player.facing * 25, y: 410, vx: 0, vy: 0 });
+    player._attackBuffer = 0.18;
+    game._tryHits();
+    assert.equal(game.rally, 1, 'even enabled combos respect contact cooldown');
+    player._hitCooldown = 0;
+    game._tryHits();
+    assert.equal(game.rally, allowCombo ? 2 : 1);
+    assert.equal(game._crossedNetSinceHit, false);
+  }
+});
+
+test('net-bounce combos are optional and a wall bounce on the original half does not bypass disabled combos', () => {
+  for (const allowCombo of [false, true]) for (const bounce of ['net', 'wall']) {
+    const game = launchConfiguredServe({ rules: { allowCombo } });
+    if (bounce === 'net') Object.assign(game.shuttle, { x: 548, y: 350, vx: 600, vy: 0 });
+    else Object.assign(game.shuttle, { x: 30, y: 350, vx: -600, vy: 0 });
+    game.update(1 / 60);
+    assert.ok(game.events.some((event) => event.type === bounce));
+    assert.equal(game._crossedNetSinceHit, false);
+    Object.assign(game.players[0], { _hitCooldown: 0, _attackBuffer: 0.18 });
+    Object.assign(game.shuttle, { x: 290, y: 410, vx: 0, vy: 0 });
+    game._tryHits();
+    assert.equal(game.rally, allowCombo ? 2 : 1);
+  }
+});
+
+test('after a legal net crossing same-player recovery requires a wall rebound in either combo mode', () => {
+  for (const allowCombo of [false, true]) for (const wallRebound of [false, true]) {
+    const game = launchConfiguredServe({ rules: { allowCombo } });
+    Object.assign(game.shuttle, { x: 548, y: 250, vx: 600, vy: 0 });
+    game.update(1 / 60);
+    assert.equal(game._crossedNetSinceHit, true);
+    if (wallRebound) {
+      Object.assign(game.shuttle, { x: 1070, y: 250, vx: 600, vy: 0 });
+      game.update(1 / 60);
+    }
+    Object.assign(game.players[0], { _hitCooldown: 0, _attackBuffer: 0.18 });
+    Object.assign(game.shuttle, { x: 290, y: 410, vx: 0, vy: 0 });
+    game._tryHits();
+    assert.equal(game.rally, wallRebound ? 2 : 1);
+  }
+});
+
+test('own combos keep serve restrictions active and cannot turn a prohibited wall contact or short serve into a legal rally', () => {
+  for (const violation of ['serve-wall', 'serve-short']) {
+    const game = launchConfiguredServe({ rules: { allowCombo: true, allowServeWall: false, requireServiceLine: true } });
+    Object.assign(game.players[0], { _hitCooldown: 0, _attackBuffer: 0.18 });
+    Object.assign(game.shuttle, { x: 290, y: 410, vx: 0, vy: 0 });
+    game._tryHits();
+    assert.equal(game.rally, 2);
+    assert.equal(game.serveFlightActive, true);
+    if (violation === 'serve-wall') Object.assign(game.shuttle, { x: 30, y: 300, vx: -600, vy: 0 });
+    else Object.assign(game.shuttle, { x: 650, y: 494, vx: 0, vy: 200 });
+    game.update(1 / 60);
+    assert.equal(game.pointReason, violation);
+    assert.deepEqual(game.score, [0, 1]);
+    assert.equal(game.events.filter((event) => event.type === 'point').length, 1);
+  }
+});
