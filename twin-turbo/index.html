@@ -74,14 +74,175 @@
     </main>
     <footer><span>BUILT FOR A LITTLE FRIENDLY RIVALRY.</span><span>左右分屏 · 离线可用 · 无需账号 <i></i> TWIN TURBO / 2026</span></footer>
   </div>
-  <dialog id="help-dialog" aria-labelledby="help-title"><button class="close-dialog" id="close-help" aria-label="关闭操作说明">×</button><p class="eyebrow">DRIVER'S BRIEFING</p><h2 id="help-title">发车前，了解一下。</h2><p>两位玩家共用键盘，各占半个屏幕，使用斜后方 3D 镜头跟随自己的赛车。沿路线箭头驾驶，先完成全部圈数的玩家获胜。</p><div class="help-players"><div class="cyan"><strong>01 青色闪电</strong><p><kbd>W</kbd> 加速 · <kbd>S</kbd> 刹车 / 倒车<br><kbd>A</kbd><kbd>D</kbd> 转向 · <kbd>左 Shift</kbd> 氮气</p></div><div class="orange"><strong>02 橙色风暴</strong><p><kbd>↑</kbd> 加速 · <kbd>↓</kbd> 刹车 / 倒车<br><kbd>←</kbd><kbd>→</kbd> 转向 · <kbd>Enter</kbd> 氮气</p></div></div><p class="help-tip">这条赛道有长直道、连续 S 弯和回头弯。弯前松油或轻点刹车，出弯再用氮气。氮气会自动恢复；抄近路无法完成一圈。卡住时，玩家一按 <kbd>Q</kbd>、玩家二按 <kbd>/</kbd> 返回赛道，并承受 2 秒罚停。</p><p><kbd>Esc</kbd> 暂停 / 继续 · 离开游戏窗口会自动暂停。</p><button class="start-button" id="help-done">准备好了 <span>✓</span></button></dialog>
+  <dialog id="help-dialog" aria-labelledby="help-title"><button class="close-dialog" id="close-help" aria-label="关闭操作说明">×</button><p class="eyebrow">DRIVER'S BRIEFING</p><h2 id="help-title">发车前，了解一下。</h2><p>两位玩家共用键盘，各占半个屏幕，使用斜后方 3D 镜头跟随自己的赛车。沿路线箭头驾驶，先完成全部圈数的玩家获胜。</p><div class="help-players"><div class="cyan"><strong>01 青色闪电</strong><p><kbd>W</kbd> 加速 · <kbd>S</kbd> 刹车 / 倒车<br><kbd>A</kbd><kbd>D</kbd> 转向 · <kbd>左 Shift</kbd> 氮气</p></div><div class="orange"><strong>02 橙色风暴</strong><p><kbd>↑</kbd> 加速 · <kbd>↓</kbd> 刹车 / 倒车<br><kbd>←</kbd><kbd>→</kbd> 转向 · <kbd>Enter</kbd> 氮气</p></div></div><p class="help-tip">这条赛道有长直道、连续 S 弯和回头弯。弯前松油或轻点刹车，出弯再用氮气。氮气会自动恢复。树木、建筑与护栏会挡住车辆，撞上会减速；轻微压路肩仍能正常计圈，大幅抄近路不能完成一圈。卡住时，玩家一按 <kbd>Q</kbd>、玩家二按 <kbd>/</kbd> 返回赛道，并承受 2 秒罚停。</p><p><kbd>Esc</kbd> 暂停 / 继续 · 离开游戏窗口会自动暂停。</p><button class="start-button" id="help-done">准备好了 <span>✓</span></button></dialog>
   <script>
-const Engine = (() => {
+const Collisions = (() => {
+/** Static ground obstacles in physics x/y coordinates (rendering world x/z). */
+const EPSILON = 1e-9;
+const SEPARATION = .002;
+const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+function obstacleShape(source) {
+  if (!source || !Number.isFinite(source.x) || !Number.isFinite(source.y)) {
+    throw new TypeError('Obstacle positions must be finite.');
+  }
+  if (source.type === 'circle') {
+    if (!(source.radius > 0) || !Number.isFinite(source.radius)) {
+      throw new TypeError('Circle obstacles need a positive finite radius.');
+    }
+    return { ...source, minX: source.x - source.radius, maxX: source.x + source.radius,
+      minY: source.y - source.radius, maxY: source.y + source.radius };
+  }
+  if (source.type !== 'box' || !(source.halfWidth > 0) || !(source.halfDepth > 0)
+    || !Number.isFinite(source.halfWidth + source.halfDepth + (source.angle ?? 0))) {
+    throw new TypeError('Box obstacles need positive finite half extents and a finite angle.');
+  }
+  const cosine = Math.cos(source.angle || 0), sine = Math.sin(source.angle || 0);
+  const extentX = Math.abs(cosine) * source.halfWidth + Math.abs(sine) * source.halfDepth;
+  const extentY = Math.abs(sine) * source.halfWidth + Math.abs(cosine) * source.halfDepth;
+  return { ...source, cosine, sine,
+    minX: source.x - extentX, maxX: source.x + extentX,
+    minY: source.y - extentY, maxY: source.y + extentY };
+}
+
+function contact(car, obstacle, radius) {
+  const dx = car.x - obstacle.x, dy = car.y - obstacle.y;
+  if (obstacle.type === 'circle') {
+    const sum = radius + obstacle.radius, squared = dx * dx + dy * dy;
+    if (squared >= sum * sum) return null;
+    if (squared < EPSILON) {
+      const direction = car.speed < 0 ? 1 : -1;
+      return { nx: Math.cos(car.angle) * direction, ny: Math.sin(car.angle) * direction, depth: sum };
+    }
+    const distance = Math.sqrt(squared);
+    return { nx: dx / distance, ny: dy / distance, depth: sum - distance };
+  }
+
+  // Work in the box's local axes; the closest-point test keeps rounded car
+  // corners accurate instead of treating the expanded AABB as a solid box.
+  const { cosine: c, sine: s, halfWidth: hw, halfDepth: hd } = obstacle;
+  const localX = dx * c + dy * s, localY = -dx * s + dy * c;
+  const closestX = clamp(localX, -hw, hw), closestY = clamp(localY, -hd, hd);
+  const differenceX = localX - closestX, differenceY = localY - closestY;
+  const squared = differenceX * differenceX + differenceY * differenceY;
+  if (squared >= radius * radius) return null;
+  let nx, ny, depth;
+  if (squared > EPSILON) {
+    const distance = Math.sqrt(squared);
+    nx = differenceX / distance; ny = differenceY / distance; depth = radius - distance;
+  } else {
+    // A center inside/on a box must exit its nearest face, including exact
+    // center coincidence where the opposite velocity gives a stable side.
+    const toX = hw - Math.abs(localX), toY = hd - Math.abs(localY);
+    const forwardX = Math.cos(car.angle) * c + Math.sin(car.angle) * s;
+    const forwardY = -Math.cos(car.angle) * s + Math.sin(car.angle) * c;
+    if (toX < toY) {
+      nx = Math.sign(localX) || Math.sign(-forwardX * (car.speed || 1)) || 1;
+      ny = 0; depth = radius + toX;
+    } else {
+      nx = 0;
+      ny = Math.sign(localY) || Math.sign(-forwardY * (car.speed || 1)) || 1;
+      depth = radius + toY;
+    }
+  }
+  return { nx: nx * c - ny * s, ny: nx * s + ny * c, depth };
+}
+
+/**
+ * Immutable obstacle geometry with a spatial hash for large scenery sets.
+ * circle: { type:'circle', x,y,radius }
+ * box: { type:'box', x,y,halfWidth,halfDepth,angle } (angle in radians)
+ */
+class ObstacleWorld {
+  constructor(obstacles = [], { carRadius = 21, cellSize = 240 } = {}) {
+    if (!(carRadius > 0) || !Number.isFinite(carRadius) || !(cellSize > 0) || !Number.isFinite(cellSize)) {
+      throw new TypeError('Collision dimensions must be positive and finite.');
+    }
+    this.carRadius = carRadius;
+    this.cellSize = cellSize;
+    this.obstacles = obstacles.map(obstacleShape);
+    this.cells = new Map();
+    // Useful for profiling without depending on wall-clock test timing.
+    this.lastCandidateChecks = 0;
+    for (let index = 0; index < this.obstacles.length; index++) {
+      const obstacle = this.obstacles[index];
+      for (let x = Math.floor(obstacle.minX / cellSize); x <= Math.floor(obstacle.maxX / cellSize); x++) {
+        for (let y = Math.floor(obstacle.minY / cellSize); y <= Math.floor(obstacle.maxY / cellSize); y++) {
+          const key = `${x},${y}`;
+          if (!this.cells.has(key)) this.cells.set(key, []);
+          this.cells.get(key).push(index);
+        }
+      }
+    }
+  }
+
+  _candidates(x, y) {
+    const radius = this.carRadius, size = this.cellSize, found = new Set();
+    for (let gx = Math.floor((x - radius) / size); gx <= Math.floor((x + radius) / size); gx++) {
+      for (let gy = Math.floor((y - radius) / size); gy <= Math.floor((y + radius) / size); gy++) {
+        for (const index of this.cells.get(`${gx},${gy}`) || []) found.add(index);
+      }
+    }
+    return found;
+  }
+
+  _separate(car, touched) {
+    // Re-query after displacement because resolving a building can place the
+    // car beside a second object in a different spatial-hash cell.
+    for (let iteration = 0; iteration < 8; iteration++) {
+      let corrected = false;
+      for (const index of this._candidates(car.x, car.y)) {
+        this.lastCandidateChecks++;
+        const hit = contact(car, this.obstacles[index], this.carRadius);
+        if (!hit) continue;
+        corrected = true; touched.add(index);
+        car.x += hit.nx * (hit.depth + SEPARATION);
+        car.y += hit.ny * (hit.depth + SEPARATION);
+        const normalHeading = Math.cos(car.angle) * hit.nx + Math.sin(car.angle) * hit.ny;
+        const incoming = car.speed * normalHeading;
+        // Apply an impulse only while moving into the surface. Reversing or
+        // steering away never suffers a second braking impulse or wall lock.
+        if (incoming < -.01) {
+          car.speed -= 1.08 * incoming * normalHeading;
+          car.impact = Math.max(car.impact || 0, clamp(-incoming / 160, .12, 1));
+        }
+      }
+      if (!corrected) break;
+    }
+  }
+
+  /**
+   * Resolve in place and return the number of distinct objects touched.
+   * Passing the previous {x,y} also sweeps the displacement in short steps,
+   * preventing thin poles/rails from being skipped by an unusually long move.
+   * Normal simulation ticks move at most 517/120 = 4.31 pixels.
+   */
+  resolveCar(car, previousPosition = null) {
+    this.lastCandidateChecks = 0;
+    if (!this.obstacles.length || !Number.isFinite(car.x + car.y + car.angle + car.speed)) return 0;
+    const touched = new Set();
+    if (previousPosition && Number.isFinite(previousPosition.x + previousPosition.y)) {
+      const dx = car.x - previousPosition.x, dy = car.y - previousPosition.y;
+      const steps = Math.max(1, Math.ceil(Math.hypot(dx, dy) / (this.carRadius / 2)));
+      car.x = previousPosition.x; car.y = previousPosition.y;
+      for (let step = 0; step < steps; step++) {
+        car.x += dx / steps; car.y += dy / steps;
+        this._separate(car, touched);
+      }
+    } else this._separate(car, touched);
+    return touched.size;
+  }
+}
+
+return {ObstacleWorld};
+})();
+const Engine = (({ObstacleWorld}) => {
+
 /** Pure, deterministic arcade simulation. Distances are pixels; time is seconds. */
 const TAU = Math.PI * 2;
 const CHECKPOINTS = 32;
-// At the normal 330 px/s cruise speed, the 15,522 pixel route takes
-// approximately 47 seconds. Extend the geography, not the car's response.
+// At the normal 363 px/s cruise speed, the 15,522 pixel route takes
+// approximately 43 seconds. The long route preserves a full-length lap.
 const CIRCUIT_SCALE = 2.6;
 
 // One continuous technical circuit. The two opposite S bends and the infield
@@ -124,6 +285,7 @@ const LENGTH = circuitLength;
 
 const TRACK = Object.freeze({
   width: 2500 * CIRCUIT_SCALE, height: 1650 * CIRCUIT_SCALE, roadWidth: 120,
+  checkpointMargin: 40,
   length: LENGTH, startDistance: 0, checkpoints: CHECKPOINTS,
   segments: Object.freeze(segments),
 });
@@ -204,15 +366,25 @@ function createCar(id) {
     finished: false, finishTime: null, missedCheckpoint: false, rescueCooldown: 0,
     _lane: lane, _started: false, _nextCheckpoint: 0,
     _lastTrackS: p.s, _lastX: p.x, _lastY: p.y,
-    _lastCheckpointS: TRACK.startDistance - 30, _lastOnRoad: true,
+    _lastCheckpointS: TRACK.startDistance - 30, _lastCheckpointEligible: true,
     _lapStartTime: 0,
   };
 }
 
 class RaceEngine {
-  constructor({ laps = 3 } = {}) {
+  constructor({ laps = 3, obstacles = [] } = {}) {
     this.laps = clamp(Math.round(laps) || 3, 1, 9);
+    this.obstacleWorld = new ObstacleWorld(obstacles);
     this.reset();
+  }
+
+  setObstacles(obstacles = []) {
+    this.obstacleWorld = new ObstacleWorld(obstacles);
+    for (const car of this.cars) {
+      this.obstacleWorld.resolveCar(car);
+      this._contain(car);
+    }
+    return this;
   }
 
   reset() {
@@ -258,7 +430,7 @@ class RaceEngine {
     car.rescueCooldown = 2;
     car.offroad = false; car.lastSkid = false; car.impact = 0;
     car._lastTrackS = p.s; car._lastX = p.x; car._lastY = p.y;
-    car._lastOnRoad = true; car.missedCheckpoint = false;
+    car._lastCheckpointEligible = true; car.missedCheckpoint = false;
     this._updateProgress(car, p.s);
   }
 
@@ -284,9 +456,19 @@ class RaceEngine {
 
   _simulate(dt, keys) {
     this.time += dt;
-    for (const car of this.cars) this._drive(car, dt, keys);
+    for (const car of this.cars) {
+      const previous = { x: car.x, y: car.y };
+      this._drive(car, dt, keys);
+      this.obstacleWorld.resolveCar(car, previous);
+      this._contain(car);
+    }
     this._collide();
-    for (const car of this.cars) this._advance(car, dt);
+    for (const car of this.cars) {
+      // Another car must not shove this car through a building or barrier.
+      this.obstacleWorld.resolveCar(car);
+      this._contain(car);
+      this._advance(car, dt);
+    }
     const finishers = this.cars.filter(car => car.finished);
     if (finishers.length) {
       this.winner = finishers.sort((a, b) => a.finishTime - b.finishTime)[0];
@@ -312,20 +494,29 @@ class RaceEngine {
     car.boosting = boost && forward && !reverse && car.boost > 0.5
       && car.speed > 40 && !car.offroad;
     car.boost = clamp(car.boost + (car.boosting ? -32 : 12) * dt, 0, 100);
-    const maximum = car.offroad ? 145 : car.boosting ? 470 : 330;
+    const maximum = car.offroad ? 145 : car.boosting ? 517 : 363;
     if (forward && reverse) {
       car.speed = approach(car.speed, 0, 400 * dt);
     } else if (reverse) {
       car.speed = approach(car.speed, -115, (car.speed > 0 ? 375 : 150) * dt);
     } else if (forward) {
-      car.speed = approach(car.speed, maximum, (car.speed < 0 ? 350 : car.offroad ? 145 : car.boosting ? 440 : 235) * dt);
+      car.speed = approach(car.speed, maximum, (car.speed < 0 ? 350 : car.offroad ? 145 : car.boosting ? 484 : 258.5) * dt);
     } else {
       car.speed = approach(car.speed, 0, (car.offroad ? 145 : 62) * dt);
     }
     if (car.speed > maximum) car.speed = approach(car.speed, maximum, (car.offroad ? 620 : 250) * dt);
-    car.steer = approach(car.steer, Number(right) - Number(left), dt * 8);
+    const steerTarget = Number(right) - Number(left);
+    // Ease into a held key over 200 ms. Release/countersteer returns toward
+    // center faster, so corrections do not leave a long steering tail.
+    const returning = steerTarget === 0 || (car.steer !== 0 && Math.sign(steerTarget) !== Math.sign(car.steer));
+    car.steer = approach(car.steer, steerTarget, dt * (returning ? 7 : 5));
     const grip = Math.min(Math.abs(car.speed) / 180, 1);
-    const turn = car.steer * 2.18 * (0.23 + grip * 0.77)
+    // Retain easy low-speed turns, soften normal cruise by 16.5%, and reduce
+    // steering a further 8% progressively across the boost speed range.
+    const speed = Math.abs(car.speed);
+    const turnLimit = (2.18 - .36 * clamp(speed / 363, 0, 1))
+      * (1 - .08 * clamp((speed - 363) / (517 - 363), 0, 1));
+    const turn = car.steer * turnLimit * (0.23 + grip * 0.77)
       * Math.min(Math.abs(car.speed) / 30, 1) * Math.sign(car.speed);
     car.angle = mod(car.angle + turn * dt + Math.PI, TAU) - Math.PI;
     car.x += Math.cos(car.angle) * car.speed * dt;
@@ -359,8 +550,8 @@ class RaceEngine {
     const closing = b.speed * bh - a.speed * ah;
     if (closing < 0) {
       const impulse = -closing * 0.64;
-      a.speed = clamp(a.speed - impulse * ah, -160, 470);
-      b.speed = clamp(b.speed + impulse * bh, -160, 470);
+      a.speed = clamp(a.speed - impulse * ah, -160, 517);
+      b.speed = clamp(b.speed + impulse * bh, -160, 517);
     }
     a.impact = b.impact = 1;
     this._contain(a);
@@ -370,12 +561,17 @@ class RaceEngine {
   _advance(car, dt) {
     const p = projectTrack(car.x, car.y);
     const onRoad = p.distance <= TRACK.roadWidth / 2;
+    const checkpointLimit = TRACK.roadWidth / 2 + TRACK.checkpointMargin;
+    const checkpointEligible = p.distance <= checkpointLimit;
     const delta = signedDistance(car._lastTrackS, p.s);
     const displacement = Math.hypot(car.x - car._lastX, car.y - car._lastY);
     const midpoint = projectTrack((car.x + car._lastX) / 2, (car.y + car._lastY) / 2);
-    // Both ends and midpoint must remain on the road. Reject teleports as well
-    // as infield jumps; reversing never earns a checkpoint.
-    const valid = onRoad && car._lastOnRoad && midpoint.distance <= TRACK.roadWidth / 2
+    // Short excursions onto the shoulder still pass invisible checkpoints.
+    // Asphalt grip/slowdown stays strict, while both ends and the midpoint of
+    // checkpoint movement must stay within the road plus its narrow runoff.
+    // Ordered gates and bounded forward movement still reject shortcuts,
+    // teleports, and repeated backward/forward finish-line crossings.
+    const valid = checkpointEligible && car._lastCheckpointEligible && midpoint.distance <= checkpointLimit
       && delta > 0 && delta < 24 && displacement < 24;
     if (valid) {
       const gate = mod(TRACK.startDistance + car._nextCheckpoint * LENGTH / CHECKPOINTS, LENGTH);
@@ -404,7 +600,7 @@ class RaceEngine {
       }
     }
     // Give the renderer a helpful recover prompt if an expected gate was
-    // crossed off the road, or if a relocation skipped it.
+    // crossed beyond the runoff, or if a relocation skipped it.
     if (!valid && delta > 0) {
       const gate = mod(TRACK.startDistance + car._nextCheckpoint * LENGTH / CHECKPOINTS, LENGTH);
       if (mod(gate - car._lastTrackS, LENGTH) <= delta) car.missedCheckpoint = true;
@@ -414,7 +610,7 @@ class RaceEngine {
     car.offroad = !onRoad;
     this._updateProgress(car, p.s);
     car._lastTrackS = p.s; car._lastX = car.x; car._lastY = car.y;
-    car._lastOnRoad = onRoad;
+    car._lastCheckpointEligible = checkpointEligible;
   }
 
   _updateProgress(car, s) {
@@ -427,11 +623,12 @@ class RaceEngine {
 }
 
 return {RaceEngine, TRACK, trackPoint, projectTrack, mod};
-})();
+})(Collisions);
 const Rendering = (({RaceEngine, TRACK, trackPoint, projectTrack, mod}) => {
 /** Native WebGL racing renderer: two genuinely perspective, low chase cameras. */
 
 const TAU = Math.PI * 2;
+const CAR_CLEARANCE_HEIGHT = 25;
 const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
 const mix = (a, b, t) => a + (b - a) * t;
 const identity = () => new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
@@ -470,7 +667,7 @@ function updateChaseCamera(car, previous, dt = 1 / 60) {
   const blend = snap ? 1 : 1 - Math.exp(-Math.max(0, Math.min(dt, 0.1)) * 7.5);
   const turnBlend = snap ? 1 : 1 - Math.exp(-Math.max(0, Math.min(dt, 0.1)) * 9);
   const angle = snap ? car.angle : previous.angle + (mod(car.angle - previous.angle + Math.PI, TAU) - Math.PI) * turnBlend;
-  const speed = clamp(Math.abs(car.speed || 0) / 470, 0, 1);
+  const speed = clamp(Math.abs(car.speed || 0) / 517, 0, 1);
   const distance = 169 + speed * 18;
   const height = 76 + speed * 8;
   const lateral = 13;
@@ -489,7 +686,7 @@ const rgba = (color, alpha = 1) => {
 };
 
 class MeshBuilder {
-  constructor() { this.data = []; }
+  constructor(colliders=null) { this.data = [];this.colliders=colliders; }
   vertex(v, normal, color, emission = 0) { this.data.push(...v, ...normal, ...rgba(color), emission); }
   triangle(a, b, c, color, emission = 0, normal) {
     normal ||= normalize(cross(b.map((n, i) => n - a[i]), c.map((n, i) => n - a[i])));
@@ -499,6 +696,10 @@ class MeshBuilder {
     this.triangle(a, b, c, color, emission, normal); this.triangle(a, c, d, color, emission, normal);
   }
   box(x, y, z, sx, sy, sz, color, angle = 0, emission = 0) {
+    // Only the scene builder opts in. Roads, paint, vehicles and shadows do not.
+    if(this.colliders&&y-sy/2<CAR_CLEARANCE_HEIGHT&&y+sy/2>0)this.colliders.push({
+      id:`prop-${this.colliders.length}`,type:'box',x,y:z,halfWidth:sx/2,halfDepth:sz/2,angle,
+    });
     const c = Math.cos(angle), s = Math.sin(angle);
     const p = (a, b, d) => [x + c * a - s * d, y + b, z + s * a + c * d];
     const hx = sx / 2, hy = sy / 2, hz = sz / 2;
@@ -506,6 +707,14 @@ class MeshBuilder {
     for (const [a,b,d,e] of [[0,3,2,1],[4,5,6,7],[0,4,7,3],[1,2,6,5],[3,7,6,2],[0,1,5,4]]) this.quad(v[a],v[b],v[d],v[e],color,emission);
   }
   cone(x, y, z, radius, height, color, sides = 7, topRadius = 0, phase = 0) {
+    // Use the largest real cross-section inside the vehicle's height band.
+    // Low foliage is solid; crowns wholly above the roof remain passable below.
+    if(this.colliders&&y<CAR_CLEARANCE_HEIGHT&&y+height>0) {
+      const sectionAt=heightY=>mix(radius,topRadius,clamp((heightY-y)/height,0,1));
+      this.colliders.push({id:`prop-${this.colliders.length}`,type:'circle',x,y:z,
+        radius:Math.max(sectionAt(Math.max(y,0)),sectionAt(Math.min(y+height,CAR_CLEARANCE_HEIGHT))),
+      });
+    }
     for (let i = 0; i < sides; i++) {
       const a = phase + i / sides * TAU, b = phase + (i + 1) / sides * TAU;
       const p = [x + Math.cos(a) * radius, y, z + Math.sin(a) * radius];
@@ -744,8 +953,48 @@ function cornerMarkers() {
   return markers;
 }
 
+/** Local +Z is the driver's right: an outer mast's arm must extend toward -side. */
+function lampGeometry(distance,side=1) {
+  const q=trackPoint(distance,side*(TRACK.roadWidth/2+27));
+  const right=[-Math.sin(q.angle),Math.cos(q.angle)];
+  const inward=(reach,height)=>[q.x-right[0]*side*reach,height,q.y-right[1]*side*reach];
+  return {s:distance,side,angle:q.angle,
+    mast:{position:[q.x,37,q.y],size:[3,74,3]},
+    arm:{position:inward(22,73),size:[3,3,46]},
+    head:{position:inward(43,71),size:[9,4,12]},
+    lens:{position:inward(43,68.6),size:[8,.7,10]},
+  };
+}
+
+function roadsideLamps() {
+  const lamps=[];
+  for(let s=0,i=0;s<TRACK.length;s+=47,i++) {
+    const p=trackPoint(s),coastal=p.y>TRACK.height*.63,city=p.x>TRACK.width*.56&&p.y<TRACK.height*.63;
+    if((coastal||city)&&i%3===0)lamps.push(lampGeometry(s));
+  }
+  return lamps;
+}
+
+/** Paint sits on the upstream face, with three actual > or < shaped chevrons. */
+function cornerMarkerGeometry(marker) {
+  const forward=[Math.cos(marker.angle),Math.sin(marker.angle)],right=[-forward[1],forward[0]];
+  const normal=[-forward[0],0,-forward[1]],direction=Math.sign(marker.turn);
+  const point=(horizontal,height)=>[marker.x-forward[0]*1.2+right[0]*horizontal,height,marker.y-forward[1]*1.2+right[1]*horizontal];
+  const stroke=(a,b)=>{
+    const length=Math.hypot(b[0]-a[0],b[1]-a[1]);
+    const dx=-(b[1]-a[1])/length*.85,dy=(b[0]-a[0])/length*.85;
+    return [point(a[0]+dx,a[1]+dy),point(b[0]+dx,b[1]+dy),point(b[0]-dx,b[1]-dy),point(a[0]-dx,a[1]-dy)];
+  };
+  const chevrons=[];
+  for(const center of [-7,0,7]) {
+    const upper=[center-direction*2.5,45],tip=[center+direction*2.5,40],lower=[center-direction*2.5,35];
+    chevrons.push({tip:point(...tip),tails:[point(...upper),point(...lower)],strokes:[stroke(upper,tip),stroke(tip,lower)]});
+  }
+  return {normal,chevrons};
+}
+
 function buildWorld() {
-  const terrain=new MeshBuilder(), props=new MeshBuilder(), water=new MeshBuilder();
+  const obstacles=[],terrain=new MeshBuilder(), props=new MeshBuilder(obstacles), water=new MeshBuilder();
   const rng=random(90421), w=TRACK.width, h=TRACK.height;
   const shoreZ=shoreBoundary();
   const grid=130;
@@ -788,17 +1037,11 @@ function buildWorld() {
   }
   // Lamp posts and reflective barriers support road reading, including hairpins.
   for(let s=0,i=0;s<TRACK.length;s+=47,i++) {
-    const p=trackPoint(s), coastal=p.y>h*.63, city=p.x>w*.56&&p.y<h*.63;
+    const p=trackPoint(s), coastal=p.y>h*.63;
     if(i%3===0) {
       const side=i%2?1:-1, q=trackPoint(s,side*(TRACK.roadWidth/2+25));
       props.box(q.x,5,q.y,3,10,3,'#c7d3c3');
       props.box(q.x,9.5,q.y,4,2,4,i%2?'#ffbc7d':'#9ceaff',0,.65);
-    }
-    if((coastal||city)&&i%3===0) {
-      const q=trackPoint(s,TRACK.roadWidth/2+27),angle=q.angle;
-      props.box(q.x,37,q.y,3,74,3,'#516976');
-      props.box(q.x-Math.sin(angle)*8,73,q.y+Math.cos(angle)*8,3,3,20,'#77969e',angle);
-      props.box(q.x-Math.sin(angle)*16,71,q.y+Math.cos(angle)*16,7,2,10,'#ffdfa0',angle,.9);
     }
     if(coastal && i%2===0) {
       const side=p.y>h*.81?1:-1;
@@ -807,15 +1050,18 @@ function buildWorld() {
       props.box((q.x+r.x)/2,14,(q.y+r.y)/2,Math.hypot(r.x-q.x,r.y-q.y),5,2,'#b8c9cb',Math.atan2(r.y-q.y,r.x-q.x));
     }
   }
+  for(const lamp of roadsideLamps()) {
+    props.box(...lamp.mast.position,...lamp.mast.size,'#516976',lamp.angle);
+    props.box(...lamp.arm.position,...lamp.arm.size,'#77969e',lamp.angle);
+    props.box(...lamp.head.position,...lamp.head.size,'#5c7580',lamp.angle);
+    props.box(...lamp.lens.position,...lamp.lens.size,'#ffdfa0',lamp.angle,.95);
+  }
   // Road-side chevrons anticipate the technical corners instead of blind bends.
   for(const q of cornerMarkers()) {
-    const {side}=q;
+    const geometry=cornerMarkerGeometry(q);
     props.box(q.x,19,q.y,5,38,3,'#536d77');
-    props.box(q.x,34,q.y,2,19,23,'#142a39',q.angle);
-    for(let k=0;k<3;k++) {
-      const xx=q.x+Math.cos(q.angle)*1.3-Math.sin(q.angle)*(k*6-6),zz=q.y+Math.sin(q.angle)*1.3+Math.cos(q.angle)*(k*6-6);
-      props.box(xx,34,zz,1.5,11,2.3,'#ffdb89',q.angle+side*.5,.75);
-    }
+    props.box(q.x,40,q.y,2,19,23,'#142a39',q.angle);
+    for(const chevron of geometry.chevrons)for(const vertices of chevron.strokes)props.quad(...vertices,'#ffdb89',.75,geometry.normal);
   }
   const start=trackPoint(TRACK.startDistance),half=TRACK.roadWidth/2+15;
   for(const side of [-1,1]) {
@@ -830,8 +1076,11 @@ function buildWorld() {
     const p=trackPoint(TRACK.startDistance,-half+k*half*2/14+5);
     props.box(p.x,90,p.y,16,5,8,k%2?'#f0efe4':'#273b49',start.angle);
   }
-  return { terrain, props, water };
+  return { terrain, props, water, obstacles };
 }
+
+/** Headless physics verification uses the exact production mesh-building path. */
+function sceneObstacles() {return buildWorld().obstacles;}
 
 function carMesh(color) {
   const m=new MeshBuilder();
@@ -907,7 +1156,7 @@ function sceneWeights(x,y) {
 
 class RaceRenderer {
   constructor(canvas,{sceneUrls={}}={}) {
-    this.canvas=canvas;this.available=false;this.error=null;this.cameras=[null,null];this.textures={};
+    this.canvas=canvas;this.available=false;this.error=null;this.cameras=[null,null];this.textures={};this.obstacles=[];
     this.sceneUrls={coast:'./assets/coast.png',alpine:'./assets/alpine.png',city:'./assets/city.png',...sceneUrls};
     try {
       const gl=canvas.getContext('webgl',{alpha:false,antialias:true,depth:true,powerPreference:'high-performance'})||canvas.getContext('experimental-webgl',{alpha:false,antialias:true,depth:true});
@@ -927,6 +1176,7 @@ class RaceRenderer {
     for(const name of ['uTextureA','uTextureB','uTextureC','uReadyA','uReadyB','uReadyC','uWeights','uHeading','uAspect','uZenith','uHorizon'])this.skyUniforms[name]=gl.getUniformLocation(this.skyProgram,name);
     this.skyBuffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,this.skyBuffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);
     const world=buildWorld();
+    this.obstacles=world.obstacles;
     this.meshes={terrain:upload(gl,world.terrain),road:upload(gl,buildRoad()),water:upload(gl,world.water),props:upload(gl,world.props),cars:[upload(gl,carMesh('#57dbe6')),upload(gl,carMesh('#ff9870'))],flames:upload(gl,flameMesh()),shadow:upload(gl,shadowMesh())};
     this.worldMatrix=identity();
     this.textures={};
@@ -1000,7 +1250,7 @@ class RaceRenderer {
       for(const vehicle of engine.cars)this._mesh(this.meshes.shadow,modelMatrix(vehicle.x,1.3,vehicle.y,vehicle.angle));
       gl.depthMask(true);gl.disable(gl.BLEND);
       for(let j=0;j<engine.cars.length;j++) {
-        const vehicle=engine.cars[j],roll=-clamp(vehicle.steer||0,-1,1)*Math.min(Math.abs(vehicle.speed)/330,1)*.035;
+        const vehicle=engine.cars[j],roll=-clamp(vehicle.steer||0,-1,1)*Math.min(Math.abs(vehicle.speed)/363,1)*.035;
         const bounce=vehicle.offroad?Math.sin(now*.041+vehicle.id)*Math.min(Math.abs(vehicle.speed)/100,1)*.7:0;
         const model=modelMatrix(vehicle.x,1.5+bounce,vehicle.y,vehicle.angle,roll);
         this._mesh(this.meshes.cars[j%2],model);
@@ -1021,6 +1271,7 @@ const hud = $('hud');
 const ctx = hud.getContext('2d');
 const engine = new RaceEngine();
 const renderer = new RaceRenderer(canvas, { sceneUrls: globalThis.TWIN_SCENE_ART });
+engine.setObstacles(renderer.obstacles || []);
 const keys = new Set();
 const colors = ['#51dfe5', '#ff9870'];
 const names = ['青色闪电', '橙色风暴'];
@@ -1125,7 +1376,7 @@ function updateUI(now) {
     $('lap'+car.id).textContent=car.lap;
     $('boost'+car.id).style.width=car.boost+'%';$('boost-label'+car.id).textContent=Math.round(car.boost)+'%';
     $('speed'+car.id).textContent=Math.round(Math.abs(car.speed)*.66);
-    $('offroad'+car.id).textContent=car.rescueCooldown>0?'返回赛道 · 罚停中':car.missedCheckpoint?`漏过检查点 · 按 ${i===0?'Q':'/'} 回赛道`:car.offroad?'草地减速':car.boosting?'NITRO ON':'';
+    $('offroad'+car.id).textContent=car.rescueCooldown>0?'返回赛道 · 罚停中':car.missedCheckpoint?`漏过检查点 · 按 ${i===0?'Q':'/'} 回赛道`:car.impact>.15?'碰撞 · 减速':car.offroad?'草地减速':car.boosting?'NITRO ON':'';
   }
   if(engine.state!==lastState){
     $('menu').classList.toggle('hidden',engine.state!=='menu');$('pause-panel').classList.toggle('hidden',engine.state!=='paused');$('result').classList.toggle('hidden',engine.state!=='finished');
