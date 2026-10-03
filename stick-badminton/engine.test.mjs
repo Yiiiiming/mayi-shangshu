@@ -2,6 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game, WORLD } from './engine.mjs';
 
+// Historical physics fixtures explicitly use open, manual serves and no combos.
+// The actual entry defaults are covered separately below.
+const OPEN_RULES = { allowServeWall: true, requireServiceLine: false, autoLegalServe: false, allowCombo: false };
+const createGame = (options = {}) => new Game({ ...options, rules: { ...OPEN_RULES, ...options.rules } });
+
 function advance(game, seconds, inputs = []) {
   for (let frame = 0; frame < Math.ceil(seconds * 120); frame += 1) game.update(1 / 120, inputs);
 }
@@ -23,7 +28,7 @@ function landOn(game, side) {
 }
 
 test('only the correct server can start; the serve clears the net', () => {
-  const game = new Game();
+  const game = createGame();
   assert.equal(game.phase, 'ready');
   game.start();
   advance(game, 0.7, [{}, { hit: true }]);
@@ -41,7 +46,7 @@ test('only the correct server can start; the serve clears the net', () => {
 });
 
 test('holding normal hit throughout a rally never swings automatically', () => {
-  const game = new Game();
+  const game = createGame();
   game.start();
   serve(game);
   advance(game, 80, [{ hit: true }, { hit: true }]);
@@ -51,7 +56,7 @@ test('holding normal hit throughout a rally never swings automatically', () => {
 });
 
 test('a player cannot hit the shuttle twice in succession', () => {
-  const game = new Game();
+  const game = createGame();
   game.start();
   serve(game);
   const rally = game.rally;
@@ -64,7 +69,7 @@ test('a player cannot hit the shuttle twice in succession', () => {
 });
 
 test('movement stays on each half and holding jump does not auto-bounce', () => {
-  const game = new Game();
+  const game = createGame();
   game.start();
   advance(game, 2, [{ right: true, jump: true }, { left: true }]);
   assert.equal(game.players[0].x, WORLD.netX - 37);
@@ -77,7 +82,7 @@ test('movement stays on each half and holding jump does not auto-bounce', () => 
 });
 
 test('a below-tape shot bounces back and awards the opposing player', () => {
-  const game = new Game();
+  const game = createGame();
   game.start();
   game.phase = 'playing';
   game.lastHitter = 0;
@@ -93,7 +98,7 @@ test('a below-tape shot bounces back and awards the opposing player', () => {
 });
 
 test('a point pauses briefly, resets court positions, then waits for the winner to serve', () => {
-  const game = new Game();
+  const game = createGame();
   game.start();
   landOn(game, 0);
   assert.equal(game.phase, 'point');
@@ -108,7 +113,7 @@ test('a point pauses briefly, resets court positions, then waits for the winner 
 });
 
 test('11 points requires a two-point lead; the deciding cap is 15', () => {
-  const game = new Game();
+  const game = createGame();
   game.start();
   game.score = [10, 10];
   landOn(game, 1);
@@ -131,7 +136,7 @@ test('11 points requires a two-point lead; the deciding cap is 15', () => {
 
 test('both back walls reflect horizontal velocity, preserve vertical motion, and keep the point alive', () => {
   for (const side of [0, 1]) {
-    const game = new Game();
+    const game = createGame();
     game.start();
     game.phase = 'playing';
     game.lastHitter = 1 - side;
@@ -149,7 +154,7 @@ test('both back walls reflect horizontal velocity, preserve vertical motion, and
 
 test('an aerial power shot is faster than a normal clear and clears the tape', () => {
   const makeContact = (shot) => {
-    const game = new Game();
+    const game = createGame();
     game.start();
     game.phase = 'playing';
     game.lastHitter = 1;
@@ -169,7 +174,7 @@ test('an aerial power shot is faster than a normal clear and clears the tape', (
 });
 
 test('invalid and resumed-tab timesteps do not corrupt or skip the match', () => {
-  const game = new Game();
+  const game = createGame();
   game.start();
   game.update(NaN, [{ hit: true }]);
   game.update(-5, [{ hit: true }]);
@@ -181,7 +186,7 @@ test('invalid and resumed-tab timesteps do not corrupt or skip the match', () =>
 });
 
 test('a very low last-second save near the net does not launch into a huge offscreen arc', () => {
-  const game = new Game();
+  const game = createGame();
   game.start();
   game.phase = 'playing';
   game.lastHitter = 1;
@@ -196,7 +201,7 @@ test('a very low last-second save near the net does not launch into a huge offsc
 });
 
 test('a player holding the shuttle near the net keeps it on their own side', () => {
-  const game = new Game();
+  const game = createGame();
   game.start();
   advance(game, 2, [{ right: true }, {}]);
   assert.ok(game.shuttle.x < WORLD.netX);
@@ -206,7 +211,7 @@ test('a player holding the shuttle near the net keeps it on their own side', () 
 });
 
 test('the original hitter can rescue a wall rebound that crosses back to their court', () => {
-  const game = new Game();
+  const game = createGame();
   game.start();
   game.phase = 'playing';
   game.lastHitter = 0;
@@ -223,7 +228,7 @@ test('the original hitter can rescue a wall rebound that crosses back to their c
 });
 
 function contact({ side = 0, offset = 25, height = 100, incomingX = -400, incomingY = 180, playerX = 0, playerY = 0, shot = 'hit', charge = 0.5 } = {}) {
-  const game = new Game();
+  const game = createGame();
   game.start();
   game.phase = 'playing';
   game.lastHitter = 1 - side;
@@ -284,7 +289,7 @@ test('contact-dependent physics mirror exactly between blue and red players', ()
 test('grounded, aerial, backcourt, and high front-court power contacts hit the opposite wall on both sides', () => {
   for (const side of [0, 1]) {
     for (const [x, feet, ballY] of [[320, 500, 400], [120, 500, 400], [440, 500, 400], [320, 385, 260], [485, 385, 260]]) {
-      const game = new Game();
+      const game = createGame();
       game.start();
       game.phase = 'playing';
       game.lastHitter = 1 - side;
@@ -306,7 +311,7 @@ test('grounded, aerial, backcourt, and high front-court power contacts hit the o
 });
 
 test('removed smash input has no effect during either a rally or serving', () => {
-  const game = new Game();
+  const game = createGame();
   game.start();
   advance(game, 1.4, [{ smash: true }, {}]);
   game.update(1 / 120);
@@ -323,7 +328,7 @@ test('removed smash input has no effect during either a rally or serving', () =>
 
 test('charge-and-release works for both players using the normal hit input', () => {
   for (const side of [0, 1]) {
-    const game = new Game();
+    const game = createGame();
     game.start();
     game.server = side;
     const inputs = [{}, {}];
@@ -347,7 +352,7 @@ test('a tap serves just past the net, half charge serves deep, and full charge h
   for (const side of [0, 1]) {
     const landings = [];
     for (const duration of [0.05, 0.6, 1.3]) {
-      const game = new Game();
+      const game = createGame();
       game.start();
       game.server = side;
       serve(game, duration);
@@ -373,7 +378,7 @@ test('a tap serves just past the net, half charge serves deep, and full charge h
 });
 
 test('full charge is capped and never fires automatically while held', () => {
-  const game = new Game();
+  const game = createGame();
   game.start();
   advance(game, 4, [{ hit: true }, {}]);
   assert.equal(game.phase, 'serve');
@@ -387,7 +392,7 @@ test('full charge is capped and never fires automatically while held', () => {
 });
 
 test('power does not charge a serve or delay the release of normal hit', () => {
-  const game = new Game();
+  const game = createGame();
   game.start();
   advance(game, 0.7, [{ power: true }, {}]);
   assert.equal(game.serveCharging, false);
@@ -405,7 +410,7 @@ test('power does not charge a serve or delay the release of normal hit', () => {
 
 test('the non-server cannot charge or release a serve', () => {
   for (const side of [0, 1]) {
-    const game = new Game();
+    const game = createGame();
     game.start();
     game.server = side;
     const inputs = [{}, {}];
@@ -420,7 +425,7 @@ test('the non-server cannot charge or release a serve', () => {
 });
 
 test('a quick press and release during the initial countdown is queued and fires once ready', () => {
-  const game = new Game();
+  const game = createGame();
   game.start();
   advance(game, 0.05, [{ hit: true }, {}]);
   game.update(1 / 120);
@@ -435,7 +440,7 @@ test('a quick press and release during the initial countdown is queued and fires
 });
 
 test('canceling charge prevents accidental release and requires a fresh press', () => {
-  const game = new Game();
+  const game = createGame();
   game.start();
   advance(game, 0.7, [{ hit: true }, {}]);
   game.cancelServeCharge();
@@ -450,7 +455,7 @@ test('canceling charge prevents accidental release and requires a fresh press', 
 });
 
 test('canceling an already-released queued tap does not fire after the countdown', () => {
-  const game = new Game();
+  const game = createGame();
   game.start();
   advance(game, 0.05, [{ hit: true }, {}]);
   game.update(1 / 120);
@@ -462,7 +467,7 @@ test('canceling an already-released queued tap does not fire after the countdown
 });
 
 test('a button held across a point cannot charge the next serve until released and pressed again', () => {
-  const game = new Game();
+  const game = createGame();
   game.start();
   serve(game);
   landOn(game, 1);
@@ -477,7 +482,7 @@ test('a button held across a point cannot charge the next serve until released a
 });
 
 test('reset and restart clear both active and queued serve charges', () => {
-  const game = new Game();
+  const game = createGame();
   game.start();
   advance(game, 0.2, [{ hit: true }, {}]);
   game.reset();
@@ -496,7 +501,7 @@ test('reset and restart clear both active and queued serve charges', () => {
 });
 
 test('long varied-input sessions remain finite, within the walls, and visibly on court', () => {
-  const game = new Game();
+  const game = createGame();
   game.start();
   let seed = 41291;
   const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
@@ -539,7 +544,7 @@ function rallyContact(game, side, shot = 'hit') {
 }
 
 test('each player starts with three power shots and serves do not spend or earn them', () => {
-  const game = new Game();
+  const game = createGame();
   assert.deepEqual(game.players.map(({ powerCharges, powerProgress }) => [powerCharges, powerProgress]), [[3, 0], [3, 0]]);
   assert.equal(game.unlimitedPower, false);
   for (const side of [0, 1]) {
@@ -551,7 +556,7 @@ test('each player starts with three power shots and serves do not spend or earn 
 });
 
 test('power swings that miss do not spend a charge or earn contact progress', () => {
-  const game = new Game();
+  const game = createGame();
   game.start();
   game.phase = 'playing';
   Object.assign(game.shuttle, { x: WORLD.netX, y: 160, vx: 0, vy: 0, active: true });
@@ -562,7 +567,7 @@ test('power swings that miss do not spend a charge or earn contact progress', ()
 });
 
 test('normal and power contacts replenish independently every three hits with no stock cap', () => {
-  const game = new Game();
+  const game = createGame();
   game.start();
   rallyContact(game, 0);
   rallyContact(game, 1, 'power');
@@ -579,7 +584,7 @@ test('normal and power contacts replenish independently every three hits with no
 
 test('a successful power shot spends one charge and a third contact immediately recharges one', () => {
   for (const side of [0, 1]) {
-    const game = new Game();
+    const game = createGame();
     game.start();
     rallyContact(game, side, 'power');
     assert.equal(game.players[side].powerCharges, 2);
@@ -596,7 +601,7 @@ test('a successful power shot spends one charge and a third contact immediately 
 
 test('at zero charges the power button returns a normal shot and still earns recharge progress', () => {
   for (const side of [0, 1]) {
-    const game = new Game();
+    const game = createGame();
     game.start();
     game.players[side].powerCharges = 0;
     for (let hit = 0; hit < 3; hit += 1) {
@@ -614,7 +619,7 @@ test('at zero charges the power button returns a normal shot and still earns rec
 });
 
 test('a buffered or direct power contact cannot bypass an empty stock', () => {
-  const game = new Game();
+  const game = createGame();
   game.start();
   Object.assign(game.players[0], { powerCharges: 0, _requestedShot: 'power' });
   game._strike(0, false);
@@ -625,7 +630,7 @@ test('a buffered or direct power contact cannot bypass an empty stock', () => {
 });
 
 test('stock and partial recharge progress survive a point and the next serve', () => {
-  const game = new Game();
+  const game = createGame();
   game.start();
   rallyContact(game, 0, 'power');
   rallyContact(game, 1);
@@ -643,7 +648,7 @@ test('stock and partial recharge progress survive a point and the next serve', (
 });
 
 test('10–10 unlocks unlimited power once and holds the point screen for the announcement', () => {
-  const game = new Game();
+  const game = createGame();
   game.start();
   game.score = [9, 9];
   landOn(game, 1);
@@ -670,7 +675,7 @@ test('10–10 unlocks unlimited power once and holds the point screen for the an
 });
 
 test('unlimited mode allows repeated power contacts from empty stock for both players', () => {
-  const game = new Game();
+  const game = createGame();
   game.start();
   game.score = [10, 9];
   landOn(game, 0);
@@ -691,7 +696,7 @@ test('unlimited mode allows repeated power contacts from empty stock for both pl
 
 test('reset and a new match restore three charges and leave unlimited mode', () => {
   for (const reset of ['reset', 'start']) {
-    const game = new Game();
+    const game = createGame();
     game.start();
     game.score = [10, 9];
     landOn(game, 0);
@@ -705,7 +710,7 @@ test('reset and a new match restore three charges and leave unlimited mode', () 
 });
 
 function launchConfiguredServe({ side = 0, charge = 0, rules = {}, x = 265, y = 500, vx = 0, vy = 0 } = {}) {
-  const game = new Game({ rules });
+  const game = createGame({ rules });
   game.start();
   game.server = side;
   const direction = side === 0 ? 1 : -1;
@@ -728,10 +733,10 @@ function finishFlight(game) {
 }
 
 test('match rules have explicit defaults, normalized values, and survive reset and new matches', () => {
-  const defaults = { allowServeWall: true, requireServiceLine: false, autoLegalServe: false, allowCombo: false };
+  const defaults = { allowServeWall: false, requireServiceLine: false, autoLegalServe: true, allowCombo: true };
   const game = new Game();
   assert.deepEqual(game.rules, defaults);
-  assert.equal(game.autoLegalServeActive, false);
+  assert.equal(game.autoLegalServeActive, true);
   assert.equal(game.serveFlightActive, false);
   assert.deepEqual(game.setRules({ allowServeWall: false, requireServiceLine: true, autoLegalServe: true, allowCombo: true }),
     { allowServeWall: false, requireServiceLine: true, autoLegalServe: true, allowCombo: true });
@@ -820,7 +825,7 @@ test('automatic serving keeps a meaningful charge range and only constrains the 
     finishFlight(tap);
     finishFlight(full);
     if (rules.allowServeWall !== false) assert.ok(full.events.some((event) => event.type === 'wall'));
-    const game = new Game({ rules });
+    const game = createGame({ rules });
     game.start();
     game.server = side;
     const forward = side === 0 ? { right: true } : { left: true };
@@ -948,7 +953,7 @@ function holdRallyCharge(game, side, duration, inputs = [{}, {}]) {
 
 test('normal rally holds cap at full power without swinging, then spend one release on contact', () => {
   for (const side of [0, 1]) {
-    const game = new Game(); game.start();
+    const game = createGame(); game.start();
     holdRallyCharge(game, side, 1.5);
     assert.equal(game.rally, 0);
     assert.equal(game.players[side].hitCharge, 1);
@@ -967,7 +972,7 @@ test('normal rally holds cap at full power without swinging, then spend one rele
 
 test('tap, half and full charges gently extend normal range up to 30% and mirror for both players', () => {
   const flights = [0, 1].map((side) => [1 / 120, 0.375, 0.75].map((duration) => {
-    const game = new Game(); game.start();
+    const game = createGame(); game.start();
     holdRallyCharge(game, side, duration);
     game.update(1 / 120);
     const { x, y, vx, vy } = game.shuttle;
@@ -999,7 +1004,7 @@ test('uncharged returns match the deployed pre-charge game and a full hold adds 
     { offset: 82, height: 115, vx: 200, vy: -80, incomingX: -540, incomingY: 260, expected: [611.2, -424.75] },
   ];
   for (const side of [0, 1]) for (const charge of [0, 0.5, 1]) for (const c of contacts) {
-    const game = new Game(); game.start(); game.phase = 'playing';
+    const game = createGame(); game.start(); game.phase = 'playing';
     const direction = side ? -1 : 1;
     const x = side ? 780 : 320;
     Object.assign(game.players[side], { x, y: 500, vx: c.vx * direction, vy: c.vy, shotCharge: charge });
@@ -1021,7 +1026,7 @@ test('ordinary taps and full charges clear the net from standard returning posit
 });
 
 test('character abilities survive starting and restarting and unknown selections fall back to classic', () => {
-  const game = new Game({ characters: ['ninja', 'robot'] });
+  const game = createGame({ characters: ['ninja', 'robot'] });
   for (const reset of [() => {}, () => game.start(), () => game.reset()]) {
     reset();
     assert.deepEqual(game.characters, ['ninja', 'robot']);
@@ -1039,7 +1044,7 @@ test('ninja runs 10% faster and astronaut jumps 10% higher with no other movemen
   for (const side of [0, 1]) {
     const results = {};
     for (const character of ['classic', 'ninja', 'robot', 'astro']) {
-      const game = new Game({ characters: [character, character] }); game.start();
+      const game = createGame({ characters: [character, character] }); game.start();
       const input = [{}, {}]; input[side][side ? 'left' : 'right'] = true;
       advance(game, 0.25, input);
       const speed = Math.abs(game.players[side].vx);
@@ -1062,7 +1067,7 @@ test('robot adds 10% to rally shot strength at every charge, while all character
   for (const side of [0, 1]) for (const serving of [false, true]) for (const charge of [0, 0.5, 1]) for (const shot of ['hit', 'power']) {
     const flights = {};
     for (const character of ['classic', 'robot', 'ninja', 'astro']) {
-      const game = new Game({ characters: [character, character] }); game.start();
+      const game = createGame({ characters: [character, character] }); game.start();
       const direction = side ? -1 : 1;
       Object.assign(game.players[side], { x: side ? 780 : 320, y: 500, shotCharge: charge, _requestedShot: shot });
       Object.assign(game.shuttle, { x: side ? 755 : 345, y: 300, vx: -400 * direction, vy: 180 });
@@ -1081,7 +1086,7 @@ test('robot adds 10% to rally shot strength at every charge, while all character
 
 test('a released rally swing catches briefly arriving shuttles but expires after a miss', () => {
   for (const delay of [0.1, 0.22]) {
-    const game = new Game(); game.start();
+    const game = createGame(); game.start();
     holdRallyCharge(game, 0, 0.5);
     Object.assign(game.shuttle, { x: 550, y: 140, vx: 0, vy: 0 });
     game.update(1 / 120); advance(game, delay);
@@ -1095,7 +1100,7 @@ test('a released rally swing catches briefly arriving shuttles but expires after
 
 test('power interrupts a held normal charge immediately, even when stock is empty', () => {
   for (const stock of [0, 3]) for (const side of [0, 1]) {
-    const game = new Game(); game.start();
+    const game = createGame(); game.start();
     const held = holdRallyCharge(game, side, 0.5);
     game.players[side].powerCharges = stock;
     held[side].power = true;
@@ -1110,7 +1115,7 @@ test('power interrupts a held normal charge immediately, even when stock is empt
 });
 
 test('canceling one rally charge preserves the other player and blocks a stale release', () => {
-  const game = new Game(); game.start();
+  const game = createGame(); game.start();
   const inputs = [{ hit: true }, { hit: true }];
   holdRallyCharge(game, 0, 0.4, inputs);
   const otherCharge = game.players[1].hitCharge;
@@ -1127,7 +1132,7 @@ test('canceling one rally charge preserves the other player and blocks a stale r
 });
 
 test('serving cannot carry the receivers held hit into a charged return', () => {
-  const game = new Game(); game.start();
+  const game = createGame(); game.start();
   advance(game, 0.7, [{ hit: true }, { hit: true }]);
   game.update(1 / 120, [{}, { hit: true }]);
   assert.equal(game.phase, 'playing');

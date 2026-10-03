@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 // Deterministic module-level integration: real game/engine with minimal DOM and
 // an explicitly advanced frame clock. This does not launch/control a browser.
 let instance = 0;
-async function setup({ language = 'zh', start = true, confirmRules = true, confirmCharacters = true, storedLanguage = null } = {}) {
+async function setup({ language = 'zh', mode = 'local', difficulty = 'medium', confirmMode = true, start = true, confirmRules = true, confirmCharacters = true, legacyRules = true, storedLanguage = null } = {}) {
   const elements = new Map();
   let frameCallback;
   let now = 100;
@@ -54,6 +54,8 @@ async function setup({ language = 'zh', start = true, confirmRules = true, confi
     'rule-serve-open', 'rule-serve-no-wall', 'rule-serve-long', 'rule-serve-strict', 'rule-auto-off', 'rule-auto-on',
     'rule-combo-off', 'rule-combo-on', 'rules-confirm', 'rules-language', 'rules-edit',
     'characters-confirm', 'characters-back', 'characters-edit',
+    'venue-night', 'venue-classic', 'venue-sunset',
+    'mode-single', 'mode-local', 'difficulty-easy', 'difficulty-medium', 'difficulty-hard', 'mode-confirm', 'mode-language', 'mode-edit', 'rules-back',
     ...[0, 1].flatMap((side) => ['classic', 'ninja', 'robot', 'astro'].map((id) => `character-${side}-${id}`))]);
   const get = (id) => {
     if (!elements.has(id)) elements.set(id, buttonIds.has(id) ? new Button() : new Element());
@@ -111,8 +113,14 @@ async function setup({ language = 'zh', start = true, confirmRules = true, confi
   const key = (type, code, extra = {}) => win.dispatch(type, { code, target: get('game'), ...extra });
   const pointer = (type, id = 1, side = 0, action = 'hit') => touchButtons.find((b) => +b.dataset.player === side && b.dataset.action === action).dispatch(type, { pointerId: id });
   if (language) get(`choose-${language}`).dispatch('click');
-  if (language && confirmRules) get('rules-confirm').dispatch('click');
-  if (language && confirmRules && confirmCharacters) get('characters-confirm').dispatch('click');
+  if (language && confirmMode) {
+    get(`mode-${mode}`).dispatch('click'); get(`difficulty-${difficulty}`).dispatch('click'); get('mode-confirm').dispatch('click');
+  }
+  if (language && confirmMode && confirmRules) {
+    if (legacyRules) { get('rule-serve-open').dispatch('click'); get('rule-combo-off').dispatch('click'); }
+    get('rules-confirm').dispatch('click');
+  }
+  if (language && confirmMode && confirmRules && confirmCharacters) get('characters-confirm').dispatch('click');
   if (start) get('start').dispatch('click');
   tick(36);
   const text = (element) => [element.textContent, element.innerHTML, ...element.attributes.values(),
@@ -277,7 +285,7 @@ function assertEnglish(h, ids = dynamicIds) {
   for (const id of ids) assert.doesNotMatch(h.text(h.get(id)), /\p{Script=Han}/u, `Chinese leaked into #${id}`);
 }
 
-test('every page entry requires language, rules and character confirmation without hidden-button bypass', async () => {
+test('every page entry requires language, mode, rules and character confirmation without hidden-button bypass', async () => {
   for (const storedLanguage of [null, 'zh', 'en']) {
     const h = await setup({ language: null, start: false, storedLanguage });
     assert.equal(h.get('language-screen').hidden, false);
@@ -288,6 +296,13 @@ test('every page entry requires language, rules and character confirmation witho
     assert.equal(h.get('language-screen').hidden, false);
     h.get('choose-en').dispatch('click'); h.tick();
     assert.equal(h.get('language-screen').hidden, true);
+    assert.equal(h.get('mode-screen').hidden, false);
+    h.get('rules-confirm').dispatch('click'); h.get('characters-confirm').dispatch('click');
+    h.key('keydown', 'Space'); h.key('keyup', 'Space'); h.get('start').dispatch('click'); h.tick();
+    assert.equal(h.state().phase, 'ready');
+    assert.equal(h.state().modeConfirmed, false);
+    h.get('mode-local').dispatch('click'); h.get('mode-confirm').dispatch('click'); h.tick();
+    assert.equal(h.get('mode-screen').hidden, true);
     assert.equal(h.get('rules-screen').hidden, false);
     assert.equal(h.state().rulesConfirmed, false);
     assert.equal(h.get('overlay').hidden, true);
@@ -317,22 +332,22 @@ test('every page entry requires language, rules and character confirmation witho
   }
 });
 
-const defaultRules = Object.freeze({ allowServeWall: true, requireServiceLine: false, autoLegalServe: false, allowCombo: false });
+const defaultRules = Object.freeze({ allowServeWall: false, requireServiceLine: false, autoLegalServe: true, allowCombo: true });
 const serveChoices = [
   ['open', true, false], ['no-wall', false, false], ['long', true, true], ['strict', false, true],
 ];
 const click = (h, id) => { h.get(id).dispatch('click'); h.tick(); };
 
-test('rules menu starts with unrestricted serves and no automatic assistance or combos', async () => {
+test('rules menu defaults to no-wall serves with automatic assistance and consecutive hits', async () => {
   const h = await setup({ language: 'en', confirmRules: false, start: false });
   assert.equal(h.state().rulesConfirmed, false);
   assert.equal(h.state().rulesOpen, true);
   assert.equal(h.get('rules-screen').hidden, false);
   assert.equal(h.get('game-shell').hidden, true);
-  assert.equal(h.get('rule-serve-open').attributes.get('aria-pressed'), 'true');
-  assert.equal(h.get('rule-auto-off').attributes.get('aria-pressed'), 'true');
-  assert.equal(h.get('rule-combo-off').attributes.get('aria-pressed'), 'true');
-  assert.equal(h.get('serve-assist-options').hidden, true);
+  assert.equal(h.get('rule-serve-no-wall').attributes.get('aria-pressed'), 'true');
+  assert.equal(h.get('rule-auto-on').attributes.get('aria-pressed'), 'true');
+  assert.equal(h.get('rule-combo-on').attributes.get('aria-pressed'), 'true');
+  assert.equal(h.get('serve-assist-options').hidden, false);
   click(h, 'rules-confirm');
   assert.deepEqual(h.state().rules, defaultRules);
   assert.deepEqual(h.engine.rules, defaultRules);
@@ -348,6 +363,7 @@ test('all four serve choices and optional assistance reach the actual game engin
   for (const [choice, allowServeWall, requireServiceLine] of serveChoices) {
     for (const assisted of choice === 'open' ? [false] : [false, true]) {
       const h = await setup({ language: 'en', confirmRules: false, start: false });
+      click(h, 'rule-serve-open');
       click(h, `rule-serve-${choice}`);
       for (const [other] of serveChoices) {
         assert.equal(h.get(`rule-serve-${other}`).attributes.get('aria-pressed'), String(other === choice));
@@ -421,7 +437,7 @@ test('confirmed rules survive restart and an in-match language switch; rules can
   click(h, 'rules-edit');
   assert.equal(h.state().rulesOpen, true);
   click(h, 'rule-serve-open'); click(h, 'rule-combo-off'); click(h, 'rules-confirm');
-  assert.deepEqual(h.engine.rules, defaultRules);
+  assert.deepEqual(h.engine.rules, { allowServeWall: true, requireServiceLine: false, autoLegalServe: false, allowCombo: false });
 });
 
 test('editing rules after match end confirms a fresh ready screen without auto-starting', async () => {
@@ -921,4 +937,124 @@ test('only serving displays a charge meter; normal returns retain hold and relea
     assert.equal(h.state().players[0].hitCharge, 0);
     assert.equal(h.get('serve-power').hidden, true);
   }
+});
+
+test('mode menu starts with single player and Medium, and only single player exposes difficulty', async () => {
+  for (const language of ['zh', 'en']) {
+    const h = await setup({ language, confirmMode: false, start: false });
+    assert.equal(h.get('mode-screen').hidden, false);
+    assert.equal(h.get('mode-single').attributes.get('aria-pressed'), 'true');
+    assert.equal(h.get('difficulty-medium').attributes.get('aria-pressed'), 'true');
+    assert.equal(h.get('difficulty-options').hidden, false);
+    for (const difficulty of ['easy', 'medium', 'hard']) {
+      click(h, `difficulty-${difficulty}`);
+      assert.equal(h.state().draftDifficulty, difficulty);
+    }
+    click(h, 'mode-local');
+    assert.equal(h.get('difficulty-options').hidden, true);
+    click(h, 'difficulty-easy');
+    assert.equal(h.state().draftDifficulty, 'hard', 'Hidden difficulty buttons cannot modify the draft');
+    click(h, 'mode-single'); click(h, 'mode-confirm');
+    assert.equal(h.state().selectedMode, 'single');
+    assert.equal(h.state().selectedDifficulty, 'hard');
+    assert.equal(h.get('rules-screen').hidden, false);
+    click(h, 'rules-back');
+    assert.equal(h.get('mode-screen').hidden, false);
+    assert.equal(h.state().draftDifficulty, 'hard');
+    click(h, 'mode-language');
+    assert.equal(h.get('language-screen').hidden, false);
+    click(h, language === 'zh' ? 'choose-zh' : 'choose-en');
+    assert.equal(h.get('mode-screen').hidden, false);
+    assert.equal(h.get('rules-screen').hidden, true);
+    if (language === 'en') for (const node of h.staticNodes) {
+      if (node.dataset.i18n) assert.doesNotMatch(node.textContent, /undefined|\p{Script=Han}/u);
+      if (node.dataset.i18nAria) assert.doesNotMatch(node.attributes.get('aria-label'), /undefined|\p{Script=Han}/u);
+      if (node.dataset.i18nTitle) assert.doesNotMatch(node.attributes.get('title'), /undefined|\p{Script=Han}/u);
+    }
+  }
+});
+
+test('single player disables human P2 controls and the computer plays real returns at every difficulty', async () => {
+  for (const difficulty of ['easy', 'medium', 'hard']) {
+    const h = await setup({ language: 'en', mode: 'single', difficulty, legacyRules: false });
+    assert.equal(h.state().selectedDifficulty, difficulty);
+    assert.equal(h.get('p2-controls').hidden, true);
+    assert.equal(h.get('p2-touch').hidden, true);
+    assert.equal(h.get('ai-controls').hidden, false);
+    assert.match(h.get('ai-controls-copy').textContent.toLowerCase(), new RegExp(difficulty));
+    h.key('keydown', 'ArrowRight'); h.key('keydown', 'ArrowUp'); h.key('keydown', 'ArrowDown'); h.key('keydown', 'Slash');
+    h.pointer('pointerdown', 55, 1, 'jump'); h.tick(12);
+    assert.equal(h.state().players[1].y, 500, 'Human P2 jump input cannot move the computer');
+    assert.ok(h.state().players[1].x < 860, 'Human P2 movement cannot drag the computer to the wall');
+    assert.equal(h.state().players[1].hitCharging, false);
+    assert.equal(h.state().players[1].powerCharges, 3);
+    h.key('keyup', 'ArrowRight'); h.key('keyup', 'ArrowUp'); h.key('keyup', 'ArrowDown'); h.key('keyup', 'Slash');
+    h.pointer('pointerup', 55, 1, 'jump');
+    let returned = false, computerServed = false, serveFrames = 0, serving = false, serveNumber = 0;
+    for (let frame = 0; frame < 2400 && !computerServed; frame++) {
+      const before = h.state();
+      if (before.phase === 'serve' && before.server === 0) {
+        if (!serving) { h.key('keydown', 'KeyS'); serving = true; serveFrames = 0; serveNumber++; }
+        if (++serveFrames === [18, 40, 65][serveNumber % 3]) h.key('keyup', 'KeyS');
+      } else { h.key('keyup', 'KeyS'); serving = false; }
+      h.tick();
+      const after = h.state();
+      if (after.phase === 'playing' && after.server === 0 && after.lastHitter === 1) returned = true;
+      if (before.phase === 'serve' && before.server === 1 && after.phase === 'playing') computerServed = true;
+    }
+    assert.ok(returned, `${difficulty} computer must return a real human serve within several points`);
+    assert.ok(computerServed, `${difficulty} computer must serve its earned point without human controls`);
+    assertEnglish(h);
+  }
+});
+
+test('single player mode and difficulty persist through pause, language and restart, and edit only before play', async () => {
+  const h = await setup({ language: 'en', mode: 'single', difficulty: 'hard', legacyRules: false });
+  assert.equal(h.get('mode-edit').hidden, true);
+  click(h, 'mode-edit'); click(h, 'mode-local'); click(h, 'mode-confirm');
+  assert.equal(h.state().selectedMode, 'single');
+  h.key('keydown', 'KeyS'); h.tick(80); h.key('keyup', 'KeyS'); h.tick(10);
+  click(h, 'pause');
+  const frozen = h.state(); h.tick(80);
+  assert.deepEqual(h.state().shuttle, frozen.shuttle);
+  assert.deepEqual(h.state().players, frozen.players);
+  click(h, 'lang-switch'); click(h, 'choose-zh');
+  assert.equal(h.state().selectedMode, 'single');
+  assert.equal(h.state().selectedDifficulty, 'hard');
+  assert.match(h.get('ai-controls-copy').textContent, /困难/);
+  click(h, 'start'); h.tick(10); click(h, 'restart');
+  assert.equal(h.state().selectedMode, 'single');
+  assert.equal(h.state().selectedDifficulty, 'hard');
+  assert.equal(h.state().phase, 'ready');
+  click(h, 'mode-edit'); click(h, 'mode-local'); click(h, 'mode-confirm'); click(h, 'rules-confirm'); click(h, 'characters-confirm');
+  assert.equal(h.state().selectedMode, 'local');
+  assert.equal(h.get('p2-controls').hidden, false);
+  assert.equal(h.get('p2-touch').hidden, false);
+  assert.equal(h.get('ai-controls').hidden, true);
+});
+
+test('venues are selected with characters, persist across language and restart, and cannot change during play', async () => {
+  const h = await setup({ language: 'en', start: false, confirmCharacters: false });
+  assert.equal(h.state().selectedVenue, 'night');
+  for (const id of ['night', 'classic', 'sunset']) {
+    click(h, `venue-${id}`);
+    assert.equal(h.state().draftVenue, id);
+    assert.equal(h.state().selectedVenue, 'night');
+    assert.ok(h.get(`venue-preview-${id}`).innerHTML.includes('<svg'));
+    assert.ok(h.get(`venue-name-${id}`).textContent.trim());
+    assert.doesNotMatch(h.text(h.get(`venue-name-${id}`)), /undefined|\p{Script=Han}/u);
+    assert.equal(h.get(`venue-${id}`).attributes.get('aria-pressed'), 'true');
+  }
+  click(h, 'characters-confirm');
+  assert.equal(h.state().selectedVenue, 'sunset');
+  click(h, 'start'); click(h, 'venue-classic');
+  assert.equal(h.state().selectedVenue, 'sunset');
+  click(h, 'lang-switch'); click(h, 'choose-zh');
+  assert.equal(h.state().selectedVenue, 'sunset');
+  click(h, 'start'); click(h, 'restart');
+  assert.equal(h.state().selectedVenue, 'sunset');
+  click(h, 'characters-edit');
+  assert.equal(h.state().draftVenue, 'sunset');
+  click(h, 'venue-classic'); click(h, 'characters-confirm');
+  assert.equal(h.state().selectedVenue, 'classic');
 });

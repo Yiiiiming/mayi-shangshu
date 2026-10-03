@@ -1,8 +1,8 @@
 /** Deterministic physics for a two-player arcade badminton court. */
-import { CHARACTER_STATS } from './characters.mjs?v=gentle-charge-1';
+import { CHARACTER_STATS } from './characters.mjs?v=neon-court-1';
 export const WORLD = Object.freeze({ width: 1100, height: 600, floorY: 500, netX: 550, netTop: 315, wallLeft: 28, wallRight: 1072, wallTop: 90, serviceLineLeft: 300, serviceLineRight: 800 });
 
-export const DEFAULT_RULES = Object.freeze({ allowServeWall: true, requireServiceLine: false, autoLegalServe: false, allowCombo: false });
+export const DEFAULT_RULES = Object.freeze({ allowServeWall: false, requireServiceLine: false, autoLegalServe: true, allowCombo: true });
 
 const GRAVITY = 680;
 const PLAYER_GRAVITY = 1800;
@@ -45,13 +45,14 @@ export class Game {
       characterId: this.characters[side], stats: CHARACTER_STATS[this.characters[side]],
       x: side ? 835 : 265, y: WORLD.floorY, vx: 0, vy: 0,
       facing: side ? -1 : 1, swing: 0, shot: 'hit',
+      contactX: 62, contactY: -100,
       hitCharge: 0, hitCharging: false, shotCharge: 0, _hitBlocked: false, _powerWasDown: false,
       powerCharges: 3, powerProgress: 0,
-      color: side ? '#e56047' : '#2364dc',
+      color: side ? '#ff745d' : '#4b8cff',
       _jumpWasDown: false, _jumpBuffer: 0, _attackBuffer: 0,
       _attackCooldown: 0, _hitCooldown: 0, _requestedShot: 'hit',
     }));
-    this.shuttle = { x: 303, y: 432, vx: 0, vy: 0, active: false, trail: [] };
+    this.shuttle = { x: 303, y: 432, vx: 0, vy: 0, active: false, powerShot: false, trail: [] };
     this.score = [0, 0];
     this.unlimitedPower = false;
     this.phase = 'ready';
@@ -239,7 +240,7 @@ export class Game {
 
   _movePlayer(side, input, dt) {
     const player = this.players[side];
-    player.swing = Math.max(0, player.swing - dt / 0.25);
+    player.swing = Math.max(0, player.swing - dt / (player.shot === 'power' ? 0.42 : 0.34));
     player._attackCooldown = Math.max(0, player._attackCooldown - dt);
     player._hitCooldown = Math.max(0, player._hitCooldown - dt);
     player._attackBuffer = Math.max(0, player._attackBuffer - dt);
@@ -436,8 +437,12 @@ export class Game {
     shuttle.vx = direction * clamp(horizontal, 170, (attacking || serving ? 1250 : 950 * 1.3) * shotPower);
     shuttle.vy = clamp(vertical, -maximumLift, 340);
     shuttle.active = true;
+    shuttle.powerShot = attacking;
     shuttle.trail.length = 0;
-    player.swing = 1;
+    // Contact starts at the impact pose; the preceding hold is the backswing.
+    player.contactX = (shuttle.x - player.x) * direction;
+    player.contactY = shuttle.y - player.y;
+    player.swing = 0.78;
     player.shot = attacking ? 'power' : 'hit';
     player._hitCooldown = 0.23;
     player._attackBuffer = 0;
@@ -478,8 +483,8 @@ export class Game {
     }
     this.message = attacking ? `${NAMES[side]}强力球！` : '看准来球，挥拍！';
     this._emit(serving
-      ? { type: 'serve', player: side, charge }
-      : { type: attacking ? 'power' : 'hit', player: side, charge });
+      ? { type: 'serve', player: side, charge, x: shuttle.x, y: shuttle.y }
+      : { type: attacking ? 'power' : 'hit', player: side, charge, x: shuttle.x, y: shuttle.y });
   }
 
   _awardPoint(winner, reason) {
@@ -546,7 +551,7 @@ export class Game {
       player._powerWasDown = false;
     }
     const player = this.players[this.server];
-    Object.assign(this.shuttle, { x: player.x + player.facing * 38, y: player.y - 68, vx: 0, vy: 0, active: false });
+    Object.assign(this.shuttle, { x: player.x + player.facing * 38, y: player.y - 68, vx: 0, vy: 0, active: false, powerShot: false });
     this.shuttle.trail.length = 0;
     this.message = `${NAMES[this.server]}发球 · 按住蓄力，松开发球`;
   }
