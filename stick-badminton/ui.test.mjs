@@ -992,7 +992,7 @@ test('mode menu starts with single player and Medium, and only single player exp
   }
 });
 
-test('single player disables human P2 controls and the computer plays real returns at every difficulty', async () => {
+test('single player ignores red-only inputs and the computer plays real returns at every difficulty', async () => {
   for (const difficulty of ['easy', 'medium', 'hard']) {
     const h = await setup({ language: 'en', mode: 'single', difficulty, legacyRules: false });
     assert.equal(h.state().selectedDifficulty, difficulty);
@@ -1000,13 +1000,13 @@ test('single player disables human P2 controls and the computer plays real retur
     assert.equal(h.get('p2-touch').hidden, true);
     assert.equal(h.get('ai-controls').hidden, false);
     assert.match(h.get('ai-controls-copy').textContent.toLowerCase(), new RegExp(difficulty));
-    h.key('keydown', 'ArrowRight'); h.key('keydown', 'ArrowUp'); h.key('keydown', 'ArrowDown'); h.key('keydown', 'Slash');
+    h.key('keydown', 'KeyK');
     h.pointer('pointerdown', 55, 1, 'jump'); h.tick(12);
     assert.equal(h.state().players[1].y, 500, 'Human P2 jump input cannot move the computer');
     assert.ok(h.state().players[1].x < 860, 'Human P2 movement cannot drag the computer to the wall');
     assert.equal(h.state().players[1].hitCharging, false);
     assert.equal(h.state().players[1].powerCharges, 3);
-    h.key('keyup', 'ArrowRight'); h.key('keyup', 'ArrowUp'); h.key('keyup', 'ArrowDown'); h.key('keyup', 'Slash');
+    h.key('keyup', 'KeyK');
     h.pointer('pointerup', 55, 1, 'jump');
     let returned = false, computerServed = false, serveFrames = 0, serving = false, serveNumber = 0;
     for (let frame = 0; frame < 2400 && !computerServed; frame++) {
@@ -1024,6 +1024,116 @@ test('single player disables human P2 controls and the computer plays real retur
     assert.ok(computerServed, `${difficulty} computer must serve its earned point without human controls`);
     assertEnglish(h);
   }
+});
+
+test('single-player arrows move and jump blue while preserving the same computer behavior as WASD', async () => {
+  const play = async (bindings) => {
+    const h = await setup({ mode: 'single', difficulty: 'medium' });
+    const initial = h.state().players[0];
+    const trace = [];
+    for (const [action, frames, settle] of [['right', 12, 8], ['left', 24, 8], ['jump', 10, 60], ['hit', 36, 80]]) {
+      h.key('keydown', bindings[action]); h.tick(frames);
+      const held = h.state();
+      if (action === 'right') assert.ok(held.players[0].x > initial.x, 'Right moves blue toward the net');
+      if (action === 'left') assert.ok(held.players[0].x < initial.x, 'Left moves blue toward the rear court');
+      if (action === 'jump') assert.ok(held.players[0].y < initial.y, 'Up jumps with blue');
+      if (action === 'hit') assert.ok(held.serveCharging && held.serveCharge > 0, 'Down charges the blue serve');
+      h.key('keyup', bindings[action]); h.tick(settle);
+      const { players, shuttle, phase, score, rally, lastHitter } = h.state();
+      trace.push({ players, shuttle, phase, score, rally, lastHitter });
+    }
+    return trace;
+  };
+  const wasd = await play({ left: 'KeyA', right: 'KeyD', jump: 'KeyW', hit: 'KeyS' });
+  const arrows = await play({ left: 'ArrowLeft', right: 'ArrowRight', jump: 'ArrowUp', hit: 'ArrowDown' });
+  assert.deepEqual(arrows, wasd, 'Arrow aliases must control blue only; red stays under the same deterministic AI');
+});
+
+test('single-player Down charges a blue serve to full and releases it without controlling red', async () => {
+  const h = await setup({ mode: 'single' });
+  h.key('keydown', 'ArrowDown'); h.tick(100);
+  assert.equal(h.state().phase, 'serve');
+  assert.equal(h.state().server, 0);
+  assert.equal(h.state().serveCharge, 1);
+  assert.equal(h.get('power-meter').attributes.get('aria-valuenow'), '100');
+  assert.equal(h.state().players[1].hitCharging, false);
+  h.key('keyup', 'ArrowDown'); h.tick();
+  assert.equal(h.state().phase, 'playing');
+  assert.equal(h.state().lastHitter, 0);
+  assert.equal(h.state().rally, 1);
+});
+
+test('single-player Down charges a normal return and hits only when released', async () => {
+  const h = await setup({ mode: 'single' });
+  putIncomingShuttle(h); h.tick();
+  h.key('keydown', 'ArrowDown'); chargeTicks(h, 60);
+  assert.equal(h.state().players[0].hitCharging, true);
+  assert.equal(h.state().players[0].hitCharge, 1);
+  assert.equal(h.state().rally, 0);
+  putIncomingShuttle(h); h.key('keyup', 'ArrowDown'); h.tick();
+  assert.equal(h.state().rally, 1);
+  assert.equal(h.state().lastHitter, 0);
+  assert.equal(h.state().players[0].shot, 'hit');
+  assert.equal(h.state().players[0].hitCharging, false);
+  assert.equal(h.state().players[0].hitCharge, 0);
+  assert.ok(h.state().shuttle.vx > 500, 'The full Down charge reaches the actual return physics');
+});
+
+test('single-player Down, S and F form one serve or rally charge until every held alias is released', async () => {
+  for (const phase of ['serve', 'rally']) for (const order of [['ArrowDown', 'KeyS', 'KeyF'], ['KeyF', 'KeyS', 'ArrowDown']]) {
+    const h = await setup({ mode: 'single' });
+    if (phase === 'rally') { putIncomingShuttle(h); h.tick(); }
+    const advance = (count) => phase === 'rally' ? chargeTicks(h, count) : h.tick(count);
+    for (const key of ['ArrowDown', 'KeyS', 'KeyF']) h.key('keydown', key);
+    advance(12);
+    for (const key of order.slice(0, 2)) {
+      h.key('keyup', key); advance(6);
+      assert.equal(h.state().rally, 0, `${phase}: releasing ${key} cannot fire while another alias is held`);
+      assert.equal(phase === 'serve' ? h.state().serveCharging : h.state().players[0].hitCharging, true);
+    }
+    if (phase === 'rally') putIncomingShuttle(h);
+    h.key('keyup', order[2]); h.tick();
+    assert.equal(h.state().phase, 'playing');
+    assert.equal(h.state().rally, 1);
+    assert.equal(h.state().lastHitter, 0);
+  }
+});
+
+test('single-player E, Slash and NumpadDivide power shots belong to blue', async () => {
+  for (const key of ['KeyE', 'Slash', 'NumpadDivide']) {
+    const h = await setup({ mode: 'single' });
+    putIncomingShuttle(h); h.tick();
+    h.key('keydown', key); h.tick(); h.key('keyup', key);
+    assert.equal(h.state().rally, 1, `${key} makes a real contact`);
+    assert.equal(h.state().lastHitter, 0);
+    assert.equal(h.state().players[0].shot, 'power');
+    assert.equal(h.state().players[0].powerCharges, 2);
+    assert.equal(h.state().players[1].powerCharges, 3);
+  }
+});
+
+test('local two-player arrows still move, jump and serve with red only', async () => {
+  const h = await setup({ mode: 'local' });
+  const initial = h.state().players;
+  h.key('keydown', 'ArrowRight'); h.tick(12); h.key('keyup', 'ArrowRight');
+  assert.ok(h.state().players[1].x > initial[1].x);
+  const afterRight = h.state().players[1].x;
+  h.key('keydown', 'ArrowLeft'); h.tick(24); h.key('keyup', 'ArrowLeft');
+  assert.ok(h.state().players[1].x < afterRight);
+  h.key('keydown', 'ArrowUp'); h.tick(10); h.key('keyup', 'ArrowUp');
+  assert.ok(h.state().players[1].y < initial[1].y);
+  assert.equal(h.state().players[0].x, initial[0].x);
+  assert.equal(h.state().players[0].y, initial[0].y);
+  h.key('keydown', 'ArrowDown'); h.tick(12); h.key('keyup', 'ArrowDown'); h.tick();
+  assert.equal(h.state().phase, 'serve', 'Red cannot use Down to serve for blue');
+  assert.equal(h.state().serveCharge, 0);
+  h.engine.server = 1; h.engine._prepareServe(); h.tick(36);
+  h.key('keydown', 'ArrowDown'); h.tick(24);
+  assert.equal(h.state().serveCharging, true);
+  assert.ok(h.state().serveCharge > 0);
+  h.key('keyup', 'ArrowDown'); h.tick();
+  assert.equal(h.state().phase, 'playing');
+  assert.equal(h.state().lastHitter, 1);
 });
 
 test('single player mode and difficulty persist through pause, language and restart, and edit only before play', async () => {
