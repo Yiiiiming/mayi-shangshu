@@ -1,8 +1,14 @@
 /** Deterministic physics for a two-player arcade badminton court. */
-import { CHARACTER_STATS } from './characters.mjs?v=neon-court-1';
-export const WORLD = Object.freeze({ width: 1100, height: 600, floorY: 500, netX: 550, netTop: 315, wallLeft: 28, wallRight: 1072, wallTop: 90, serviceLineLeft: 300, serviceLineRight: 800 });
+import { CHARACTER_STATS } from './characters.mjs?v=real-court-1';
+import { COURT_WORLD } from './court.mjs?v=real-court-1';
+export const WORLD = Object.freeze({
+  width: 1100, height: 600, floorY: COURT_WORLD.floorY, netX: COURT_WORLD.netX,
+  netTop: 315, wallLeft: 28, wallRight: 1072, wallTop: 90,
+  serviceLineLeft: COURT_WORLD.serviceLineLeft, serviceLineRight: COURT_WORLD.serviceLineRight,
+});
 
-export const DEFAULT_RULES = Object.freeze({ allowServeWall: false, requireServiceLine: false, autoLegalServe: true, allowCombo: true });
+export const DEFAULT_RULES = Object.freeze({ allowServeWall: false, requireServiceLine: false, autoLegalServe: true, allowCombo: true, rallyAcceleration: true });
+export const RALLY_ACCELERATION = Object.freeze({ after: 10, step: 0.04, max: 1.6 });
 
 const GRAVITY = 680;
 const PLAYER_GRAVITY = 1800;
@@ -36,6 +42,11 @@ export class Game {
 
   get serveFlightActive() { return this._serveFlightActive; }
   get serveReachedLine() { return this._serveReachedLine; }
+  get rallySpeed() {
+    return this.phase === 'playing' && this.rules.rallyAcceleration
+      ? Math.min(RALLY_ACCELERATION.max, 1 + Math.max(0, this.rally - RALLY_ACCELERATION.after) * RALLY_ACCELERATION.step)
+      : 1;
+  }
   get autoLegalServeActive() {
     return this.rules.autoLegalServe && (!this.rules.allowServeWall || this.rules.requireServiceLine);
   }
@@ -169,9 +180,13 @@ export class Game {
     const shuttle = this.shuttle;
     const previousX = shuttle.x;
     const previousY = shuttle.y;
-    shuttle.x += shuttle.vx * dt;
-    shuttle.y += shuttle.vy * dt + 0.5 * GRAVITY * dt * dt;
-    shuttle.vy += GRAVITY * dt;
+    // Speed up the flight clock, not the shot's velocity components. A long
+    // rally then follows the same spatial arc while players, charge gestures,
+    // and contact cooldowns continue to use the real frame duration.
+    const flightDt = dt * this.rallySpeed;
+    shuttle.x += shuttle.vx * flightDt;
+    shuttle.y += shuttle.vy * flightDt + 0.5 * GRAVITY * flightDt * flightDt;
+    shuttle.vy += GRAVITY * flightDt;
 
     const crossedNet = (previousX < WORLD.netX && shuttle.x >= WORLD.netX)
       || (previousX > WORLD.netX && shuttle.x <= WORLD.netX)
@@ -181,12 +196,25 @@ export class Game {
       const crossingY = previousY + (shuttle.y - previousY) * fraction;
       if (crossingY >= WORLD.netTop - 3) {
         const fromLeft = previousX < WORLD.netX || (previousX === WORLD.netX && shuttle.vx > 0);
-        shuttle.x = WORLD.netX + (fromLeft ? -5 : 5);
-        shuttle.y = crossingY;
-        shuttle.vx *= -0.14;
-        shuttle.vy = Math.max(95, shuttle.vy * 0.3);
-        this.pointReason = '下网';
-        this._emit({ type: 'net', player: this.lastHitter });
+        if (crossingY < WORLD.netTop) {
+          // A feather clipping the top of the tape loses pace but can tumble
+          // across. Move it clear of the tape so this is one contact, not a
+          // repeated bounce on successive physics substeps.
+          shuttle.x = WORLD.netX + (fromLeft ? 5 : -5);
+          shuttle.y = WORLD.netTop - 4;
+          shuttle.vx *= 0.55;
+          shuttle.vy = -clamp(Math.abs(shuttle.vy) * 0.18, 35, 95);
+          this._crossedNetSinceHit = true;
+          this.pointReason = '';
+          this._emit({ type: 'net', player: this.lastHitter, grazed: true });
+        } else {
+          shuttle.x = WORLD.netX + (fromLeft ? -5 : 5);
+          shuttle.y = crossingY;
+          shuttle.vx *= -0.14;
+          shuttle.vy = Math.max(95, shuttle.vy * 0.3);
+          this.pointReason = '下网';
+          this._emit({ type: 'net', player: this.lastHitter });
+        }
       } else {
         this._crossedNetSinceHit = true;
       }
@@ -251,10 +279,14 @@ export class Game {
     player._jumpWasDown = Boolean(input.jump);
 
     const direction = Number(Boolean(input.right)) - Number(Boolean(input.left));
-    player.vx = approach(player.vx, direction * 365 * player.stats.speed, (direction ? 2600 : 3100) * player.stats.speed * dt);
+    // Releasing movement while airborne keeps a little momentum. Direction
+    // changes retain the familiar control strength, so a jump is still easy
+    // to correct instead of locking the player into an uncontrollable arc.
+    const coastingBrake = player.y < WORLD.floorY ? 1550 : 3100;
+    player.vx = approach(player.vx, direction * 365 * player.stats.speed, (direction ? 2600 : coastingBrake) * player.stats.speed * dt);
     player.x += player.vx * dt;
-    let minX = side ? WORLD.netX + 37 : 62;
-    let maxX = side ? WORLD.width - 62 : WORLD.netX - 37;
+    let minX = side ? WORLD.netX + 37 : COURT_WORLD.left;
+    let maxX = side ? COURT_WORLD.right : WORLD.netX - 37;
     // Automatic serves use a visible, physically feasible arc. Holding the
     // server behind the service line avoids an impossible ground-level launch
     // immediately next to the net. Normal rallies and manual serves stay free.
@@ -350,8 +382,8 @@ export class Game {
     const direction = side === 0 ? 1 : -1;
     if (serving && this.autoLegalServeActive) {
       const safeX = side === 0
-        ? clamp(player.x, 62, WORLD.serviceLineLeft)
-        : clamp(player.x, WORLD.serviceLineRight, WORLD.width - 62);
+        ? clamp(player.x, COURT_WORLD.left, WORLD.serviceLineLeft)
+        : clamp(player.x, WORLD.serviceLineRight, COURT_WORLD.right);
       if (safeX !== player.x) player.vx = 0;
       player.x = safeX;
       shuttle.x = player.x + direction * 38;
@@ -434,7 +466,11 @@ export class Game {
 
     // Keep high recovery lobs visible. Normal returns retain their entirely
     // contact-driven arc; an impossibly late low power shot can still net.
-    shuttle.vx = direction * clamp(horizontal, 170, (attacking || serving ? 1250 : 950 * 1.3) * shotPower);
+    // Near the regulation service line a legal short serve needs a slower
+    // exact arc. Keep its solved speed; normal, power, and manual serves keep
+    // their existing minimum so the court redraw cannot weaken a tap return.
+    const minimumHorizontal = serving && this.autoLegalServeActive ? 0 : 170;
+    shuttle.vx = direction * clamp(horizontal, minimumHorizontal, (attacking || serving ? 1250 : 950 * 1.3) * shotPower);
     shuttle.vy = clamp(vertical, -maximumLift, 340);
     shuttle.active = true;
     shuttle.powerShot = attacking;
@@ -485,6 +521,9 @@ export class Game {
     this._emit(serving
       ? { type: 'serve', player: side, charge, x: shuttle.x, y: shuttle.y }
       : { type: attacking ? 'power' : 'hit', player: side, charge, x: shuttle.x, y: shuttle.y });
+    if (this.rules.rallyAcceleration && this.rally === RALLY_ACCELERATION.after) {
+      this._emit({ type: 'rally-speed-warning' });
+    }
   }
 
   _awardPoint(winner, reason) {

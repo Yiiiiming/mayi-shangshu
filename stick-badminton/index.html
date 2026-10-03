@@ -7,7 +7,7 @@
   <meta id="page-description" name="description" content="Stick Badminton / 火柴人羽毛球. Choose English or 中文. Play against the computer or share a keyboard with a friend.">
   <title>Stick Badminton / 火柴人羽毛球</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=neon-court-1">
+  <link rel="stylesheet" href="style.css?v=real-court-1">
 </head>
 <body>
   <section id="language-screen" class="language-screen" aria-labelledby="language-title">
@@ -65,6 +65,12 @@
           <button id="rule-combo-on" type="button" aria-pressed="true"><strong data-i18n="ruleComboOn">允许连击（默认）</strong><span data-i18n="ruleComboOnDetail">球未越网且仍在自己半场，可以再次击打。</span></button>
         </div>
       </fieldset>
+      <fieldset><legend data-i18n="rulesRallyTitle">4. 长回合逐拍加速吗？</legend>
+        <div class="rule-options">
+          <button id="rule-rally-off" type="button" aria-pressed="false"><strong data-i18n="ruleRallyOff">关闭</strong><span data-i18n="ruleRallyOffDetail">长回合保持原有球速。</span></button>
+          <button id="rule-rally-on" type="button" aria-pressed="true"><strong data-i18n="ruleRallyOn">逐拍加速（默认）</strong><span id="rule-rally-detail">长回合逐拍提高球速，每分恢复。</span></button>
+        </div>
+      </fieldset>
       <p class="rules-note" data-i18n="rulesNote">发球限制到对方首次回击为止；对方提前接球视为接受发球。球越网后碰墙返回，仍可救球。自动合规只调整最初发球，后续连击仍按规则判定。</p>
       <button id="rules-confirm" class="primary"><b data-i18n="rulesConfirm">下一步：选择角色</b><span aria-hidden="true">↗</span></button>
     </div>
@@ -75,7 +81,7 @@
       <h1 id="characters-title" data-i18n="charactersTitle">选择角色与场馆。</h1>
       <p class="rules-intro" data-i18n="charactersIntro">双方各选一个角色，可以选相同角色。追风标准、小铁击球 +10%、影刃移动 +10%、星跃跳高 +10%；发球力度不受角色影响。</p>
       <div class="character-teams"><fieldset class="character-side character-side-0"><legend><span class="player-tag">P1</span> <span data-i18n="bluePlayer">蓝方选手</span></legend><div class="character-options"><button id="character-0-classic" class="character-option" type="button" aria-pressed="true"><span id="char-preview-0-classic" class="character-preview" aria-hidden="true"></span><strong id="char-name-0-classic"></strong><span id="char-desc-0-classic" class="character-desc"></span></button><button id="character-0-ninja" class="character-option" type="button" aria-pressed="false"><span id="char-preview-0-ninja" class="character-preview" aria-hidden="true"></span><strong id="char-name-0-ninja"></strong><span id="char-desc-0-ninja" class="character-desc"></span></button><button id="character-0-robot" class="character-option" type="button" aria-pressed="false"><span id="char-preview-0-robot" class="character-preview" aria-hidden="true"></span><strong id="char-name-0-robot"></strong><span id="char-desc-0-robot" class="character-desc"></span></button><button id="character-0-astro" class="character-option" type="button" aria-pressed="false"><span id="char-preview-0-astro" class="character-preview" aria-hidden="true"></span><strong id="char-name-0-astro"></strong><span id="char-desc-0-astro" class="character-desc"></span></button></div></fieldset><fieldset class="character-side character-side-1"><legend><span class="player-tag" data-i18n="sideTwoTag">P2</span> <span data-i18n="redPlayer">红方选手</span></legend><div class="character-options"><button id="character-1-classic" class="character-option" type="button" aria-pressed="true"><span id="char-preview-1-classic" class="character-preview" aria-hidden="true"></span><strong id="char-name-1-classic"></strong><span id="char-desc-1-classic" class="character-desc"></span></button><button id="character-1-ninja" class="character-option" type="button" aria-pressed="false"><span id="char-preview-1-ninja" class="character-preview" aria-hidden="true"></span><strong id="char-name-1-ninja"></strong><span id="char-desc-1-ninja" class="character-desc"></span></button><button id="character-1-robot" class="character-option" type="button" aria-pressed="false"><span id="char-preview-1-robot" class="character-preview" aria-hidden="true"></span><strong id="char-name-1-robot"></strong><span id="char-desc-1-robot" class="character-desc"></span></button><button id="character-1-astro" class="character-option" type="button" aria-pressed="false"><span id="char-preview-1-astro" class="character-preview" aria-hidden="true"></span><strong id="char-name-1-astro"></strong><span id="char-desc-1-astro" class="character-desc"></span></button></div></fieldset></div>
-      <fieldset class="venue-fieldset"><legend data-i18n="venuesTitle">选择场馆</legend><div class="venue-options"><button id="venue-night" class="venue-option" type="button" aria-pressed="true"><span id="venue-preview-night" class="venue-preview" aria-hidden="true"></span><strong id="venue-name-night"></strong><span id="venue-desc-night" class="venue-desc"></span></button><button id="venue-classic" class="venue-option" type="button" aria-pressed="false"><span id="venue-preview-classic" class="venue-preview" aria-hidden="true"></span><strong id="venue-name-classic"></strong><span id="venue-desc-classic" class="venue-desc"></span></button><button id="venue-sunset" class="venue-option" type="button" aria-pressed="false"><span id="venue-preview-sunset" class="venue-preview" aria-hidden="true"></span><strong id="venue-name-sunset"></strong><span id="venue-desc-sunset" class="venue-desc"></span></button></div></fieldset>
+      <fieldset class="venue-fieldset"><legend data-i18n="venuesTitle">选择场馆</legend><p class="venue-hint" data-i18n="venuesHint">默认经典绿场，选择场馆只改变风景。</p><div class="venue-options"><button id="venue-classic" class="venue-option" type="button" aria-pressed="true"><span id="venue-preview-classic" class="venue-preview" aria-hidden="true"></span><strong id="venue-name-classic"></strong><span id="venue-desc-classic" class="venue-desc"></span></button><button id="venue-sunset" class="venue-option" type="button" aria-pressed="false"><span id="venue-preview-sunset" class="venue-preview" aria-hidden="true"></span><strong id="venue-name-sunset"></strong><span id="venue-desc-sunset" class="venue-desc"></span></button><button id="venue-coast" class="venue-option" type="button" aria-pressed="false"><span id="venue-preview-coast" class="venue-preview" aria-hidden="true"></span><strong id="venue-name-coast"></strong><span id="venue-desc-coast" class="venue-desc"></span></button><button id="venue-bamboo" class="venue-option" type="button" aria-pressed="false"><span id="venue-preview-bamboo" class="venue-preview" aria-hidden="true"></span><strong id="venue-name-bamboo"></strong><span id="venue-desc-bamboo" class="venue-desc"></span></button><button id="venue-lake" class="venue-option" type="button" aria-pressed="false"><span id="venue-preview-lake" class="venue-preview" aria-hidden="true"></span><strong id="venue-name-lake"></strong><span id="venue-desc-lake" class="venue-desc"></span></button></div></fieldset>
       <button id="characters-confirm" class="primary"><b data-i18n="charactersConfirm">确认角色与场馆，进入球场</b><span aria-hidden="true">↗</span></button>
     </div>
   </section>
@@ -145,6 +151,6 @@
     <p id="live-status" class="sr-only" aria-live="polite"></p>
   </main>
   <noscript><p class="noscript"><span lang="zh-CN">请开启 JavaScript 来玩火柴人羽毛球。</span><br><span lang="en">Please enable JavaScript to play Stick Badminton.</span></p></noscript>
-  <script type="module" src="game.mjs?v=neon-court-1"></script>
+  <script type="module" src="game.mjs?v=real-court-1"></script>
 </body>
 </html>

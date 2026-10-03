@@ -1,4 +1,5 @@
-import { WORLD } from './engine.mjs?v=neon-court-1';
+import { WORLD } from './engine.mjs?v=real-court-1';
+import { COURT_WORLD } from './court.mjs?v=real-court-1';
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const PROFILES = Object.freeze({
@@ -121,7 +122,8 @@ export class BadmintonAI {
 
   move(player, target, input) {
     // Brake before the target so footwork does not oscillate every frame.
-    const brakeDistance = player.vx * Math.abs(player.vx) / (2 * 3100 * (player.stats?.speed || 1));
+    const coastingBrake = player.y < WORLD.floorY ? 1550 : 3100;
+    const brakeDistance = player.vx * Math.abs(player.vx) / (2 * coastingBrake * (player.stats?.speed || 1));
     const distance = target - player.x - brakeDistance;
     input.left = distance < -9;
     input.right = distance > 9;
@@ -155,15 +157,19 @@ export class BadmintonAI {
   intercept(game) {
     const player = game.players[this.side];
     const direction = this.side ? -1 : 1;
-    const minX = this.side ? WORLD.netX + 37 : 62;
-    const maxX = this.side ? WORLD.width - 62 : WORLD.netX - 37;
+    const minX = this.side ? WORLD.netX + 37 : COURT_WORLD.left;
+    const maxX = this.side ? COURT_WORLD.right : WORLD.netX - 37;
     let { x, y, vx, vy } = game.shuttle;
     const speed = 365 * (player.stats?.speed || 1);
+    const realStep = 1 / 180;
+    const flightStep = realStep * (game.rallySpeed ?? 1);
     let fallback = this.side ? 835 : 265;
     let best = Infinity;
     // Forecast only the visible ballistic path, including the two back walls.
     // The opponent's next hit invalidates this forecast on the next reaction.
-    for (let time = 0; time <= 2.3; time += 1 / 60) {
+    // Rally acceleration speeds up the shuttle's clock only. Available
+    // footwork time and the AI's reaction/observation clocks stay in real time.
+    for (let time = 0; time <= 2.3; time += realStep) {
       const onOwnSide = this.side ? x > WORLD.netX : x < WORLD.netX;
       if (onOwnSide && y > 315 && y < WORLD.floorY - 6 && vy > -180) {
         const target = clamp(x - direction * 62 + this.aimError, minX, maxX);
@@ -172,19 +178,31 @@ export class BadmintonAI {
         if (miss < best) { fallback = target; best = miss; }
         if (miss === 0 && y > 344) return target;
       }
-      const nextX = x + vx / 60;
-      const nextY = y + vy / 60 + 340 / (60 * 60);
-      if ((x < WORLD.netX && nextX >= WORLD.netX) || (x > WORLD.netX && nextX <= WORLD.netX)) {
+      const nextX = x + vx * flightStep;
+      const nextY = y + vy * flightStep + 340 * flightStep * flightStep;
+      const nextVy = vy + 680 * flightStep;
+      if ((x < WORLD.netX && nextX >= WORLD.netX) || (x > WORLD.netX && nextX <= WORLD.netX)
+        || (x === WORLD.netX && nextX !== x)) {
         const crossingY = y + (nextY - y) * (WORLD.netX - x) / (nextX - x);
         if (crossingY >= WORLD.netTop - 3) {
-          vx *= -0.14;
-          vy = Math.max(95, vy * 0.3);
-          x = WORLD.netX + (x < WORLD.netX ? -5 : 5);
-          y = crossingY;
+          const fromLeft = x < WORLD.netX || (x === WORLD.netX && vx > 0);
+          if (crossingY < WORLD.netTop) {
+            // A tape clip slows and tumbles across instead of returning to
+            // the hitter's half. Forecast the same visible collision as play.
+            vx *= 0.55;
+            vy = -clamp(Math.abs(nextVy) * 0.18, 35, 95);
+            x = WORLD.netX + (fromLeft ? 5 : -5);
+            y = WORLD.netTop - 4;
+          } else {
+            vx *= -0.14;
+            vy = Math.max(95, nextVy * 0.3);
+            x = WORLD.netX + (fromLeft ? -5 : 5);
+            y = crossingY;
+          }
           continue;
         }
       }
-      x = nextX; y = nextY; vy += 680 / 60;
+      x = nextX; y = nextY; vy = nextVy;
       if (x < WORLD.wallLeft && vx < 0) { x = 2 * WORLD.wallLeft - x; vx *= -0.85; }
       if (x > WORLD.wallRight && vx > 0) { x = 2 * WORLD.wallRight - x; vx *= -0.85; }
       if (y >= WORLD.floorY - 4) break;

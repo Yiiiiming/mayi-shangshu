@@ -1,8 +1,10 @@
-import { BadmintonAI } from './ai.mjs?v=neon-court-1';
-import { Game, WORLD } from './engine.mjs?v=neon-court-1';
-import { locales } from './locales.mjs?v=neon-court-1';
-import { CHARACTERS, characterPreview, drawCharacterDetails } from './characters.mjs?v=neon-court-1';
-import { VENUES, venuePreview } from './venues.mjs?v=neon-court-1';
+import { BadmintonAI } from './ai.mjs?v=real-court-1';
+import { Game, WORLD, RALLY_ACCELERATION } from './engine.mjs?v=real-court-1';
+import { locales } from './locales.mjs?v=real-court-1';
+import { CHARACTERS, characterPreview, drawCharacterDetails } from './characters.mjs?v=real-court-1';
+import { VENUES, venuePreview } from './venues.mjs?v=real-court-1';
+import { COURT_METERS } from './court.mjs?v=real-court-1';
+import { COURT_VIEW, COURT_OUTLINE, COURT_MARKINGS, projectCourtPoint, projectCourtMarking, courtLineWidth } from './court-view.mjs?v=real-court-1';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('game');
@@ -29,7 +31,8 @@ let charactersConfirmed = false;
 let charactersOpen = false;
 let selectedCharacters = ['classic', 'classic'];
 let draftCharacters = [...selectedCharacters];
-let selectedVenue = 'night';
+const validVenue = (id) => VENUES.some((venue) => venue.id === id) ? id : 'classic';
+let selectedVenue = 'classic';
 let draftVenue = selectedVenue;
 let lastCharactersUI = '';
 let copy = locales.en;
@@ -96,6 +99,7 @@ function applyLanguage() {
   });
   $('fullscreen-label').textContent = document.fullscreenElement ? copy.exitFullscreen : copy.fullscreen;
   $('power-label').textContent = copy.powerIdle;
+  $('rule-rally-detail').textContent = copy.ruleRallyOnDetail(RALLY_ACCELERATION);
   updateSoundLabel();
 }
 function chooseLanguage(value) {
@@ -172,6 +176,7 @@ function syncRuleChoices() {
   for (const value of [false, true]) {
     $(`rule-auto-${value ? 'on' : 'off'}`).setAttribute('aria-pressed', String(draftRules.autoLegalServe === value));
     $(`rule-combo-${value ? 'on' : 'off'}`).setAttribute('aria-pressed', String(draftRules.allowCombo === value));
+    $(`rule-rally-${value ? 'on' : 'off'}`).setAttribute('aria-pressed', String(draftRules.rallyAcceleration === value));
   }
 }
 for (const mode of Object.keys(serveRuleLabels)) {
@@ -192,6 +197,10 @@ for (const enabled of [false, true]) {
     if (!languageSelected || !modeConfirmed || modeOpen || !rulesOpen) return;
     draftRules.allowCombo = enabled; syncRuleChoices();
   });
+  $(`rule-rally-${enabled ? 'on' : 'off'}`).addEventListener('click', () => {
+    if (!languageSelected || !modeConfirmed || modeOpen || !rulesOpen) return;
+    draftRules.rallyAcceleration = enabled; syncRuleChoices();
+  });
 }
 $('rules-confirm').addEventListener('click', () => {
   if (!languageSelected || !modeConfirmed || modeOpen || !rulesOpen) return;
@@ -209,6 +218,7 @@ $('rules-edit').addEventListener('click', () => {
 });
 
 function syncCharacterChoices() {
+  draftVenue = validVenue(draftVenue);
   const stamp = `${language}|${draftCharacters.join(',')}|${draftVenue}`;
   if (stamp === lastCharactersUI) return;
   lastCharactersUI = stamp;
@@ -242,7 +252,7 @@ for (const venue of VENUES) {
 }
 $('characters-confirm').addEventListener('click', () => {
   if (!languageSelected || !modeConfirmed || modeOpen || !rulesConfirmed || !charactersOpen || rulesOpen) return;
-  selectedCharacters = [...draftCharacters]; selectedVenue = draftVenue; game.setCharacters(selectedCharacters); charactersConfirmed = true; charactersOpen = false;
+  selectedCharacters = [...draftCharacters]; selectedVenue = validVenue(draftVenue); game.setCharacters(selectedCharacters); charactersConfirmed = true; charactersOpen = false;
   game.reset(); paused = false; clearInputs(); particles = []; transient = ''; deuceUntil = 0; lastUI = '';
   syncUI(); $('start').focus({ preventScroll: true });
 });
@@ -412,7 +422,7 @@ function syncUI() {
   const stamp = [language, selectedMode, selectedDifficulty, game.phase, game.score, game.server, game.rally, game.serveCharging, game.unlimitedPower, game.players.map((p) => `${p.powerCharges}:${p.powerProgress}`).join(','), paused, transient, time < transientUntil].join('|');
   if (stamp === lastUI) return;
   lastUI = stamp;
-  $('rules-summary').textContent = [copy[serveRuleLabels[ruleMode]], restricted ? (game.rules.autoLegalServe ? copy.ruleSummaryAuto : copy.ruleSummaryManual) : '', game.rules.allowCombo ? copy.ruleSummaryComboOn : copy.ruleSummaryComboOff].filter(Boolean).join(' · ');
+  $('rules-summary').textContent = [copy[serveRuleLabels[ruleMode]], restricted ? (game.rules.autoLegalServe ? copy.ruleSummaryAuto : copy.ruleSummaryManual) : '', game.rules.allowCombo ? copy.ruleSummaryComboOn : copy.ruleSummaryComboOff, game.rules.rallyAcceleration ? copy.ruleSummaryRallyOn : copy.ruleSummaryRallyOff].filter(Boolean).join(' · ');
   for (let side = 0; side < 2; side++) {
     $(`score-${side}`).textContent = game.score[side];
     const player = game.players[side];
@@ -476,12 +486,120 @@ function ellipse(x, y, rx, ry, color) { ctx.beginPath(); ctx.ellipse(x, y, rx, r
 function roundRect(x, y, w, h, r, color) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fillStyle = color; ctx.fill(); }
 function textLabel(text, x, y, font, color, align = 'center') { ctx.font = font; ctx.fillStyle = color; ctx.textAlign = align; ctx.fillText(text, x, y); }
 
+function venuePolygon(points, color) {
+  ctx.beginPath(); ctx.moveTo(...points[0]);
+  for (const point of points.slice(1)) ctx.lineTo(...point);
+  ctx.closePath(); ctx.fillStyle = color; ctx.fill();
+}
+
+function drawCoastBackdrop() {
+  // Open water and distant headlands keep the center of the scene spacious.
+  ellipse(208, 151, 46, 46, '#f8e9bc1c');
+  ellipse(208, 151, 29, 29, '#f7e9c9b3');
+  for (const [x, y, width] of [[373, 113, 98], [722, 148, 126], [970, 91, 72]]) {
+    ellipse(x, y, width, 8, '#f7f6e538');
+    ellipse(x + width * .15, y - 5, width * .65, 9, '#f7f6e521');
+  }
+  const ocean = ctx.createLinearGradient(0, 252, 0, 370);
+  ocean.addColorStop(0, '#648fa0'); ocean.addColorStop(.46, '#498395'); ocean.addColorStop(1, '#376b79');
+  ctx.fillStyle = ocean; ctx.fillRect(0, 252, 1100, 136);
+  line([[0, 252], [1100, 252]], '#d6e8e34a', 1);
+  venuePolygon([[0, 257], [0, 207], [58, 218], [117, 203], [171, 230], [224, 236], [269, 255]], '#719198');
+  venuePolygon([[879, 256], [933, 235], [980, 240], [1027, 212], [1100, 218], [1100, 259]], '#789499');
+  for (let row = 0; row < 6; row++) {
+    const y = 272 + row * 15;
+    for (let col = 0; col < 5; col++) {
+      const x = 64 + col * 234 + (row % 2) * 55;
+      line([[x, y], [x + 26 + row * 8, y]], row % 2 ? '#daeae132' : '#d1e4df21', 1);
+    }
+  }
+  // A tiny sail gives the horizon scale without competing with the shuttle.
+  line([[845, 275], [845, 306]], '#d8e3dba8', 1);
+  venuePolygon([[842, 279], [842, 302], [823, 302]], '#eee7caad');
+  venuePolygon([[848, 286], [848, 302], [860, 302]], '#c8d9d6a8');
+  venuePolygon([[819, 307], [862, 307], [853, 313], [830, 313]], '#274e5c');
+  ctx.beginPath(); ctx.moveTo(0, 350); ctx.bezierCurveTo(176, 322, 225, 371, 431, 355); ctx.bezierCurveTo(668, 337, 799, 369, 1100, 340); ctx.lineTo(1100, 399); ctx.lineTo(0, 399); ctx.closePath(); ctx.fillStyle = '#c9bd99'; ctx.fill();
+  ctx.beginPath(); ctx.moveTo(0, 356); ctx.bezierCurveTo(184, 330, 243, 378, 431, 362); ctx.bezierCurveTo(680, 345, 805, 377, 1100, 346); ctx.strokeStyle = '#ece4c678'; ctx.lineWidth = 3; ctx.stroke();
+  // Coastal grass stays at the outer edges, clear of the playing silhouettes.
+  for (const side of [0, 1]) for (let n = 0; n < 8; n++) {
+    const x = side ? 1094 - n * 8 : 6 + n * 8, sign = side ? -1 : 1;
+    line([[x, 389], [x + sign * (7 + n % 3 * 4), 366 - n % 4 * 6]], '#637f68', 2);
+  }
+}
+
+function drawBambooBackdrop() {
+  venuePolygon([[0, 273], [112, 236], [248, 278], [401, 223], [578, 266], [733, 235], [900, 270], [1100, 231], [1100, 397], [0, 397]], '#a0bba1');
+  venuePolygon([[0, 319], [179, 281], [334, 316], [488, 275], [667, 312], [841, 282], [1100, 318], [1100, 397], [0, 397]], '#7fa78f');
+  const stalks = [48, 92, 149, 204, 274, 333, 764, 832, 889, 946, 1005, 1056];
+  for (let i = 0; i < stalks.length; i++) {
+    const x = stalks[i], far = i % 3 === 1, top = 70 + i % 4 * 24, lean = (i % 2 ? 1 : -1) * 12;
+    const color = far ? '#8fae94' : '#517c67';
+    line([[x, 383], [x + lean, top]], color, far ? 6 : 9);
+    line([[x + 2, 383], [x + lean + 2, top]], far ? '#c1cfac58' : '#a9c29a73', 2);
+    for (let y = top + 38; y < 373; y += 49) {
+      const stemX = x + lean * (383 - y) / (383 - top);
+      line([[stemX - (far ? 3 : 5), y], [stemX + (far ? 3 : 5), y]], far ? '#769981' : '#325f51', 2);
+      if ((Math.floor(y / 49) + i) % 2) continue;
+      const dir = i % 2 ? -1 : 1;
+      line([[stemX, y], [stemX + dir * 40, y - 23]], color, 1.3);
+      for (let leaf = 0; leaf < 4; leaf++) {
+        const bx = stemX + dir * (10 + leaf * 9), by = y - 7 - leaf * 5, flip = leaf % 2 ? -1 : 1;
+        ctx.beginPath(); ctx.moveTo(bx, by); ctx.quadraticCurveTo(bx + dir * 12, by - 15 * flip, bx + dir * 22, by - 19 * flip); ctx.quadraticCurveTo(bx + dir * 17, by - 2 * flip, bx, by); ctx.fillStyle = far ? '#86a98d' : '#497861'; ctx.fill();
+      }
+    }
+  }
+  // Low mist softens the grove; the middle stays clear for returning shots.
+  const mist = ctx.createLinearGradient(0, 239, 0, 379);
+  mist.addColorStop(0, '#dae6c400'); mist.addColorStop(.72, '#d8e4c72b'); mist.addColorStop(1, '#d8e4c705');
+  ctx.fillStyle = mist; ctx.fillRect(0, 239, 1100, 140);
+  ctx.fillStyle = '#527865'; ctx.fillRect(0, 369, 1100, 24);
+  for (const [x, width] of [[95, 38], [191, 25], [378, 34], [701, 29], [891, 39], [1016, 25]]) ellipse(x, 379, width, 7, '#829482');
+}
+
+function drawLakeBackdrop() {
+  for (const [x, y, width] of [[176, 118, 120], [506, 80, 106], [917, 126, 143]]) {
+    ellipse(x, y, width, 10, '#f1f2df24');
+    ellipse(x + width * .2, y - 5, width * .61, 10, '#f1f2df18');
+  }
+  venuePolygon([[0, 282], [68, 236], [193, 148], [301, 250], [415, 190], [556, 271], [678, 170], [818, 269], [968, 157], [1100, 244], [1100, 318], [0, 318]], '#8eafb4');
+  const peaks = [
+    { x: 270, y: 127, left: 78, right: 462, color: '#607e96' },
+    { x: 727, y: 109, left: 495, right: 966, color: '#678799' },
+    { x: 998, y: 184, left: 844, right: 1147, color: '#56778c' },
+  ];
+  for (const peak of peaks) {
+    venuePolygon([[peak.left, 306], [peak.x, peak.y], [peak.right, 306]], peak.color);
+    venuePolygon([[peak.x, peak.y], [peak.x + (peak.right - peak.x) * .34, peak.y + (306 - peak.y) * .34], [peak.x + 10, peak.y + 39], [peak.x - 13, peak.y + 55], [peak.x - 36, peak.y + 39], [peak.x - (peak.x - peak.left) * .34, peak.y + (306 - peak.y) * .34]], '#e2e5d5');
+    venuePolygon([[peak.x, peak.y + 2], [peak.right, 306], [peak.x + 21, 306], [peak.x + 31, peak.y + 66]], '#b5c6c029');
+  }
+  const water = ctx.createLinearGradient(0, 297, 0, 383);
+  water.addColorStop(0, '#648f94'); water.addColorStop(1, '#376773');
+  ctx.fillStyle = water; ctx.fillRect(0, 297, 1100, 91);
+  for (const peak of peaks) venuePolygon([[peak.left, 299], [peak.right, 299], [peak.x, 374]], '#c0d2cb10');
+  line([[0, 298], [1100, 298]], '#d0ddd154', 1);
+  for (let row = 0; row < 5; row++) for (let col = 0; col < 6; col++) {
+    const x = 38 + col * 199 + row % 2 * 65, y = 313 + row * 14;
+    line([[x, y], [x + 25 + row * 9, y]], '#d7e3db29', 1);
+  }
+  for (const [x, top, width] of [[47, 261, 24], [82, 280, 17], [1050, 252, 25], [1014, 280, 17]]) {
+    line([[x, top], [x, 387]], '#334f52', 3);
+    for (let tier = 0; tier < 4; tier++) venuePolygon([[x, top + tier * 21], [x - width * (.65 + tier * .18), top + tier * 21 + 36], [x + width * (.65 + tier * .18), top + tier * 21 + 36]], '#36595a');
+  }
+  ctx.fillStyle = '#64776e'; ctx.fillRect(0, 381, 1100, 13);
+}
+
 function drawCourt() {
-  const bright = selectedVenue === 'classic', sunset = selectedVenue === 'sunset';
+  const venue = ['sunset', 'coast', 'bamboo', 'lake'].includes(selectedVenue) ? selectedVenue : 'classic';
+  const bright = venue === 'classic', sunset = venue === 'sunset';
+  const palette = {
+    classic: ['#d9e9ed', '#e6eee4', '#f4edd5', '#abc6aa', '#96b79e', '#739b83', '#639a7f', '#477f69'],
+    sunset: ['#424c6c', '#bc7e83', '#f5c79c', '#44495d', '#414255', '#252d3d', '#4b4960', '#343e52'],
+    coast: ['#88b4c7', '#b7d1d1', '#e0dec3', '#a69d83', '#9eac9c', '#6e8c85', '#3d7781', '#305b6a'],
+    bamboo: ['#a5c1b1', '#c6d6b9', '#dde2c2', '#637f68', '#77907a', '#4d7160', '#66876c', '#496f5c'],
+    lake: ['#95b6c7', '#c2d2cc', '#dbe1c7', '#6b7e75', '#718d85', '#496c69', '#437a7e', '#305c68'],
+  }[venue];
   const sky = ctx.createLinearGradient(0, 0, 0, 450);
-  sky.addColorStop(0, bright ? '#d9e9ed' : sunset ? '#424c6c' : '#101319');
-  sky.addColorStop(.58, bright ? '#e6eee4' : sunset ? '#bc7e83' : '#17212e');
-  sky.addColorStop(1, bright ? '#f4edd5' : sunset ? '#f5c79c' : '#253547');
+  sky.addColorStop(0, palette[0]); sky.addColorStop(.58, palette[1]); sky.addColorStop(1, palette[2]);
   ctx.fillStyle = sky; ctx.fillRect(0, 0, 1100, 600);
   if (sunset) {
     // An open-air horizon: soft sun and layered ridgelines leave play unobstructed.
@@ -501,8 +619,11 @@ function drawCourt() {
     line([[0, 351], [1100, 351]], '#b9a6a64a', 2);
     for (let x = 69; x < 1100; x += 96) line([[x, 350], [x, 386]], '#b9a6a633', 2);
     line([[0, 374], [1100, 374]], '#b9a6a626', 1);
-  } else {
-    // Daylight and night share the same indoor hall with distinct materials.
+  } else if (venue === 'coast') drawCoastBackdrop();
+  else if (venue === 'bamboo') drawBambooBackdrop();
+  else if (venue === 'lake') drawLakeBackdrop();
+  else {
+    // Keep the original daylight hall and green floor unchanged.
     line([[0, 58], [1100, 58]], bright ? '#b5c9ca' : '#26313e', 2);
     line([[0, 79], [1100, 79]], bright ? '#ccd9d5' : '#1c2733', 1);
     for (let x = 85; x < 1100; x += 186) {
@@ -529,56 +650,73 @@ function drawCourt() {
     line([[0, 359], [1100, 359]], bright ? '#71968b' : '#0b121b', 5);
     line([[0, 362], [1100, 362]], bright ? '#e2ebd768' : '#5d7b9838', 1);
   }
-  ctx.fillStyle = bright ? '#abc6aa' : sunset ? '#44495d' : '#101822'; ctx.fillRect(0, 386, 1100, 14);
-  const floor = ctx.createLinearGradient(0, 393, 0, 600);
-  floor.addColorStop(0, bright ? '#96b79e' : sunset ? '#414255' : '#1b2937');
-  floor.addColorStop(1, bright ? '#739b83' : sunset ? '#252d3d' : '#101820');
-  ctx.fillStyle = floor; ctx.fillRect(0, 393, 1100, 207);
-  // The floating perimeter and two tinted halves make the playable floor clear.
-  ctx.fillStyle = bright ? '#2a574335' : '#080e1670'; ctx.beginPath(); ctx.moveTo(89, 397); ctx.lineTo(1011, 397); ctx.lineTo(1075, 564); ctx.lineTo(25, 564); ctx.closePath(); ctx.fill();
-  const court = ctx.createLinearGradient(0, 390, 0, 553);
-  court.addColorStop(0, bright ? '#639a7f' : sunset ? '#4b4960' : '#304556');
-  court.addColorStop(1, bright ? '#477f69' : sunset ? '#343e52' : '#263b4b');
-  ctx.fillStyle = court; ctx.beginPath(); ctx.moveTo(91, 390); ctx.lineTo(1009, 390); ctx.lineTo(1065, 553); ctx.lineTo(35, 553); ctx.closePath(); ctx.fill();
-  ctx.fillStyle = '#4b8cff10'; ctx.beginPath(); ctx.moveTo(91, 390); ctx.lineTo(550, 390); ctx.lineTo(550, 553); ctx.lineTo(35, 553); ctx.closePath(); ctx.fill();
-  ctx.fillStyle = '#ff745d08'; ctx.beginPath(); ctx.moveTo(550, 390); ctx.lineTo(1009, 390); ctx.lineTo(1065, 553); ctx.lineTo(550, 553); ctx.closePath(); ctx.fill();
-  line([[91, 390], [1009, 390], [1065, 553], [35, 553], [91, 390]], bright ? '#f2f1d2' : '#dce5e7', 2.5);
-  line([[70, 453], [1030, 453]], '#c8d8e2a6', 1.5);
-  line([[46, 522], [1054, 522]], '#e7eeedc4', 1.5);
-  // A service line is one ground marking, anchored to its actual rule
-  // boundary at the players' feet. Highlight the same path, never a second line.
-  const highlightService = game.rules.requireServiceLine || game.autoLegalServeActive;
-  for (const serviceX of [WORLD.serviceLineLeft, WORLD.serviceLineRight]) {
-    const path = [390, WORLD.floorY, 553].map((depth) => [WORLD.netX + (serviceX - WORLD.netX) * (1 + (depth - WORLD.floorY) * .00075), depth]);
-    line(path, highlightService ? '#f6dc99' : '#d9e5e2bd', highlightService ? 2.5 : 1.5);
-    if (highlightService) {
-      const onLeft = serviceX < WORLD.netX;
-      textLabel(copy.serviceLine, path[2][0] + (onLeft ? -12 : 12), 544, '700 9px sans-serif', '#fff0c8', onLeft ? 'right' : 'left');
-    }
+  ctx.fillStyle = palette[3]; ctx.fillRect(0, COURT_VIEW.farY - 3, WORLD.width, 14);
+  const floor = ctx.createLinearGradient(0, COURT_VIEW.farY, 0, WORLD.height);
+  floor.addColorStop(0, palette[4]); floor.addColorStop(1, palette[5]);
+  ctx.fillStyle = floor; ctx.fillRect(0, COURT_VIEW.farY, WORLD.width, WORLD.height - COURT_VIEW.farY);
+  const outline = COURT_OUTLINE.map(([x, z]) => projectCourtPoint(x, z));
+  venuePolygon(outline.map(([x, y]) => [WORLD.netX + (x - WORLD.netX) * 1.012, y + 8]), bright ? '#2a574335' : '#080e1670');
+  const court = ctx.createLinearGradient(0, COURT_VIEW.farY, 0, COURT_VIEW.nearY);
+  court.addColorStop(0, palette[6]); court.addColorStop(1, palette[7]);
+  venuePolygon(outline, court);
+  const { length, width } = COURT_METERS;
+  for (const side of [0, 1]) {
+    const from = side * length / 2, to = (side + 1) * length / 2;
+    venuePolygon([[from, 0], [to, 0], [to, width], [from, width]].map(([x, z]) => projectCourtPoint(x, z)), side ? '#ff745d08' : '#4b8cff10');
   }
-  line([[550, 390], [550, 553]], '#d9e5e2a6', 1.5);
-  line([[36, 558], [540, 558]], '#4b8cff60', 2);
-  line([[560, 558], [1064, 558]], '#ff745d50', 2);
-  // Restrained indoor reflections stay outside the contact plane.
-  if (!bright && !sunset) for (const x of [168, 362, 738, 932]) {
-      line([[x - 26, 565], [x + 26, 565]], '#e7f3ff08', 4);
-      line([[x - 16, 572], [x + 16, 572]], '#e7f3ff05', 3);
+  // Every marking comes from the same metre geometry and projection as the
+  // floor. The playing plane is y = 500, where service lines match the engine.
+  const highlightService = game.rules.requireServiceLine || game.autoLegalServeActive;
+  for (const marking of COURT_MARKINGS) {
+    const highlighted = highlightService && marking.kind === 'short-service';
+    const depth = marking.points.reduce((sum, [, z]) => sum + z, 0) / marking.points.length;
+    line(projectCourtMarking(marking), highlighted ? '#f6dc99' : bright ? '#f2f1d2' : '#e1e9e6', courtLineWidth(depth));
+    if (highlighted) {
+      const [x, y] = projectCourtPoint(marking.points[0][0], width);
+      const onLeft = x < WORLD.netX;
+      textLabel(copy.serviceLine, x + (onLeft ? -14 : 14), y - 7, '700 9px sans-serif', '#fff0c8', onLeft ? 'right' : 'left');
+    }
   }
 }
 
 function drawNet() {
-  const bright = selectedVenue === 'classic';
-  ellipse(555, 511, 24, 5, '#050b1480');
-  // Slight depth keeps a side-view net easy to read without obscuring players.
-  ctx.fillStyle = '#0b172680'; ctx.fillRect(544, WORLD.netTop, 12, WORLD.floorY - WORLD.netTop);
-  for (let y = WORLD.netTop + 8; y < WORLD.floorY; y += 10) line([[544, y], [556, y]], bright ? '#315b4ca6' : '#e0edf586', 1);
-  line([[545, WORLD.netTop], [545, WORLD.floorY]], bright ? '#2b514b99' : '#b8cfdd99', 1);
-  line([[551, WORLD.netTop], [551, WORLD.floorY]], bright ? '#2b514b99' : '#b8cfdd99', 1);
-  line([[557, WORLD.netTop - 6], [557, WORLD.floorY + 7]], '#101923', 6);
-  line([[556, WORLD.netTop - 5], [556, WORLD.floorY + 6]], '#a3b5c4', 2);
-  roundRect(539, WORLD.netTop - 7, 23, 8, 3, '#faf7e8');
-  roundRect(547, WORLD.floorY + 4, 21, 6, 2, '#142130');
-  line([[548, WORLD.floorY + 5], [567, WORLD.floorY + 5]], '#91aabc', 1);
+  const bright = selectedVenue === 'classic' || selectedVenue === 'bamboo';
+  const backX = WORLD.netX - 26, frontX = WORLD.netX;
+  // A shallow perspective reveals real mesh without covering either half court.
+  // The near end of the tape stays at the exact collision point (550, 315).
+  const topAt = (t) => WORLD.netTop - 12 * (1 - t) + Math.sin(Math.PI * t) * 2;
+  const bottomAt = (t) => topAt(t) + 80 + 14 * t;
+  const top = Array.from({ length: 13 }, (_, i) => [backX + (frontX - backX) * i / 12, topAt(i / 12)]);
+  const bottom = Array.from({ length: 13 }, (_, i) => [backX + (frontX - backX) * i / 12, bottomAt(i / 12)]);
+  ellipse(WORLD.netX, WORLD.floorY + 7, 24, 4.5, '#050b144d');
+  // Back post and compact ground feet sit behind the hanging net.
+  line([[backX - 1, topAt(0) - 4], [backX - 1, WORLD.floorY - 14]], '#314a50', 3);
+  line([[backX - 1.5, topAt(0) - 4], [backX - 1.5, WORLD.floorY - 14]], '#c0cec68c', 1);
+  line([[backX - 7, WORLD.floorY - 13], [backX + 4, WORLD.floorY - 13]], '#2c4146', 3);
+  venuePolygon([...top, ...bottom.slice().reverse()], bright ? '#1e49321a' : '#09131c29');
+  for (let col = 0; col <= 8; col++) {
+    const t = col / 8, x = backX + (frontX - backX) * t;
+    line([[x, topAt(t) + 2], [x, bottomAt(t)]], bright ? '#294c43b5' : '#142a35c9', .65);
+  }
+  for (let row = 1; row < 18; row++) {
+    const t = row / 18;
+    line(top.map(([x, y], i) => [x, y + (bottom[i][1] - y) * t]), bright ? '#294c439c' : '#172f3abc', .65);
+  }
+  line(bottom, bright ? '#365c5080' : '#b0c3c35e', 1);
+  line([[backX, topAt(0)], [backX, bottomAt(0)]], '#b6c5bd9c', 1);
+  line([[frontX, topAt(1)], [frontX, bottomAt(1)]], '#c8d4cda6', 1.2);
+  // Narrow fabric tape, with its shaded seam, follows a gentle sag.
+  line(top.map(([x, y]) => [x, y + 1.5]), '#839995', 4.5);
+  line(top, '#f7f5e6', 4.3);
+  line(top.map(([x, y]) => [x, y - 1]), '#fffff6cc', .8);
+  const postX = frontX + 3;
+  line([[postX, WORLD.netTop - 5], [postX, WORLD.floorY + 4]], '#183139', 4);
+  line([[postX - .65, WORLD.netTop - 5], [postX - .65, WORLD.floorY + 3]], '#c1d2cc', 1.15);
+  line([[frontX, WORLD.netTop], [postX + 1, WORLD.netTop]], '#e2e8dc', 1.5);
+  line([[frontX, bottomAt(1)], [postX + 1, bottomAt(1)]], '#a9bdb7', 1);
+  roundRect(postX - 2.4, WORLD.netTop - 6, 4.8, 3, 1.2, '#c4d0c9');
+  line([[postX - 8, WORLD.floorY + 5], [postX + 8, WORLD.floorY + 5]], '#21373d', 3);
+  line([[postX - 6, WORLD.floorY + 4], [postX + 6, WORLD.floorY + 4]], '#95aca58c', 1);
 }
 
 function drawWalls() {
@@ -635,7 +773,7 @@ function drawPlayer(player, side) {
   const shadowSize = 26 - (WORLD.floorY - player.y) * .065;
   ellipse(x, WORLD.floorY + 6, Math.max(14, shadowSize) + 4, 6, '#07101b40');
   ellipse(x, WORLD.floorY + 6, Math.max(14, shadowSize), 4, '#040a1460');
-  const bright = selectedVenue === 'classic';
+  const bright = selectedVenue === 'classic' || selectedVenue === 'bamboo';
   const limb = bright ? '#183d3c' : '#d5dfe8';
   line([[x - (airborne ? 16 : 12) - stride, y - (airborne ? 15 : 0)], [x - 12, y - 22], hip, [x + 13, y - 21], [x + 15 + stride, y - (airborne ? 10 : 0)]], limb, 7);
   line([hip, shoulder], limb, 8);
@@ -689,7 +827,7 @@ function drawPlayer(player, side) {
 
 function drawShuttle() {
   const shuttle = game.shuttle;
-  const bright = selectedVenue === 'classic';
+  const bright = selectedVenue !== 'sunset';
   const powerShot = shuttle.active && shuttle.powerShot;
   if (game.phase === 'ready') return;
   if (shuttle.active && !reducedMotion) {
@@ -736,6 +874,10 @@ function emitParticles(x, y, color, count = 12) {
 function events() {
   for (const event of game.events.splice(0)) {
     if (event.type === 'jump') continue;
+    if (event.type === 'rally-speed-warning') {
+      transient = 'rallySpeedWarning'; transientUntil = time + 2;
+      continue;
+    }
     sound(event.type);
     if (event.type === 'unlimited-power') {
       deuceUntil = time + 4.2;
@@ -751,9 +893,13 @@ function events() {
       hitPoint = { x: event.x ?? game.shuttle.x, y: event.y ?? game.shuttle.y, power: event.type === 'power' };
       emitParticles(hitPoint.x, hitPoint.y, hitPoint.power ? '#ff745d' : '#fff9dd', hitPoint.power ? 15 : 7);
       hitFlash = .12;
-      if (event.type === 'power') { shake = .14; transient = 'powerShot'; transientUntil = time + .52; }
+      if (event.type === 'power') {
+        shake = .14;
+        if (transient !== 'rallySpeedWarning' || time >= transientUntil) { transient = 'powerShot'; transientUntil = time + .52; }
+      }
     }
     if (event.type === 'point') {
+      transient = ''; transientUntil = 0;
       emitParticles(game.shuttle.x, WORLD.floorY - 8, colors[event.player], 20);
       $('live-status').textContent = copy.pointLive(names[event.player], game.score, names[game.server]);
     }

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Game } from './engine.mjs';
+import { Game, WORLD } from './engine.mjs';
 import { BadmintonAI } from './ai.mjs';
 
 const STEP = 1 / 60;
@@ -158,4 +158,141 @@ test('hard is stronger than easy in actual matches on both court sides', () => {
     hardWins += Number(game.winner === hardSide);
   }
   assert.ok(hardWins >= 6, `hard won ${hardWins}/8`);
+});
+
+test('AI anticipates a tape clip crossing over and returns it through ordinary inputs on either side', () => {
+  for (const side of [0, 1]) {
+    const game = new Game(); game.start();
+    game.phase = 'playing'; game.lastHitter = 1 - side; game.rally = 1;
+    // This visible incoming arc reaches the tape at about y = 313. The
+    // forecast must prepare for a short ball on the receiver's side.
+    Object.assign(game.shuttle, { x: side ? 500 : 600, y: 303.556, vx: side ? 300 : -300, vy: 0, active: true });
+    const ai = new BadmintonAI({ side, difficulty: 'hard', seed: 13 });
+    const startX = game.players[side].x;
+    let approachBeforeClip = 0;
+    for (let frame = 0; frame < 180 && game.phase === 'playing' && game.lastHitter !== side; frame += 1) {
+      const inputs = [{}, {}]; inputs[side] = ai.update(game, STEP);
+      game.update(STEP, inputs);
+      if (!game.events.some(event => event.grazed)) {
+        approachBeforeClip = Math.max(approachBeforeClip, (game.players[side].x - startX) * (side ? -1 : 1));
+      }
+    }
+    assert.ok(game.events.some(event => event.type === 'net' && event.grazed));
+    assert.ok(approachBeforeClip > 10, `side ${side} waited for a ball the visible arc already predicted`);
+    assert.equal(game.lastHitter, side, `side ${side} did not return the clipped shot`);
+    assert.ok(game.events.some(event => ['hit', 'power'].includes(event.type) && event.player === side));
+
+    const deep = new Game(); deep.start();
+    deep.phase = 'playing'; deep.lastHitter = 1 - side; deep.rally = 1;
+    Object.assign(deep.shuttle, { x: side ? 500 : 600, y: 318, vx: side ? 300 : -300, vy: 0, active: true });
+    ai.reset();
+    assert.equal(ai.intercept(deep), startX, 'a deep net collision still falls on the hitter’s side');
+    advanceAI(deep, [ai], state => state.phase !== 'playing', 3);
+    assert.ok(deep.events.some(event => event.type === 'net' && !event.grazed));
+    assert.equal(deep.score[side], 1);
+  }
+});
+
+test('airborne footwork releases early enough for the actual coasting distance, including the faster character', () => {
+  for (const character of ['classic', 'ninja']) for (const side of [0, 1]) {
+    const direction = side ? 1 : -1;
+    const fixture = () => {
+      const game = new Game({ characters: [character, character] }); game.start(); game.phase = 'playing';
+      Object.assign(game.shuttle, { x: 400, y: 100, vx: 0, vy: 0, active: true });
+      const player = game.players[side];
+      Object.assign(player, { x: side ? 750 : 350, y: 390, vy: 0, vx: direction * 365 * player.stats.speed });
+      return game;
+    };
+    // Measure the coast in the real engine instead of copying its stopping
+    // formula into the test. The movement planner should release at this gap.
+    const coast = fixture();
+    for (let frame = 0; frame < 90 && Math.abs(coast.players[side].vx) > 0.001; frame += 1) coast.update(1 / 180, []);
+    assert.ok(coast.players[side].y < WORLD.floorY);
+    const target = coast.players[side].x;
+    const game = fixture();
+    const ai = new BadmintonAI({ side, difficulty: 'hard' });
+    const airborneInput = {};
+    ai.move(game.players[side], target, airborneInput);
+    assert.equal(airborneInput.left, false, `${character}, side ${side}`);
+    assert.equal(airborneInput.right, false, `${character}, side ${side}`);
+    const groundInput = {};
+    ai.move({ ...game.players[side], y: WORLD.floorY }, target, groundInput);
+    assert.equal(groundInput[direction > 0 ? 'right' : 'left'], true, 'ground braking permits a later release');
+    const inputs = [{}, {}]; inputs[side] = airborneInput;
+    for (let frame = 0; frame < 90 && Math.abs(game.players[side].vx) > 0.001; frame += 1) game.update(1 / 180, inputs);
+    assert.ok(Math.abs(game.players[side].x - target) < 1);
+  }
+});
+
+test('every difficulty uses only legal controls through normal, eleventh-hit and capped fast rallies', () => {
+  let cases = 0;
+  for (const difficulty of DIFFICULTIES) for (const side of [0, 1]) {
+    for (const rallyAcceleration of [false, true]) for (const rally of [10, 11, 25]) {
+      for (const trajectory of ['clear', 'power', 'near-net']) {
+        const game = incomingShot(side, trajectory === 'power' ? SHOTS[4] : SHOTS[1]);
+        game.setRules({ ...game.rules, rallyAcceleration });
+        game.rally = rally;
+        if (trajectory === 'near-net') {
+          // A fast approach clips the tape and becomes a short receiving ball.
+          Object.assign(game.shuttle, { x: side ? 520 : 580, y: 303.8, vx: side ? 720 : -720, vy: 220 });
+          game.players[side].x = side ? 645 : 455;
+        }
+        assert.equal(game.rallySpeed, rallyAcceleration ? (rally === 10 ? 1 : rally === 11 ? 1.04 : 1.6) : 1);
+        const ai = new BadmintonAI({ side, difficulty, seed: 13 });
+        for (let frame = 0; frame < 300 && game.phase === 'playing' && game.lastHitter !== side; frame++) {
+          const before = JSON.stringify(game);
+          const input = ai.update(game, STEP);
+          assert.deepEqual(Object.keys(input).sort(), KEYS);
+          assert.ok(Object.values(input).every(value => typeof value === 'boolean'));
+          assert.ok(!(input.left && input.right));
+          assert.equal(JSON.stringify(game), before, 'AI must not move the ball or its player directly');
+          const inputs = [{}, {}]; inputs[side] = input;
+          game.update(STEP, inputs);
+          assert.ok(Math.abs(game.players[side].vx) <= 365 * game.players[side].stats.speed + 1e-8,
+            'accelerating the rally must not accelerate the AI player');
+          assert.ok(game.players[side].powerCharges >= 0);
+        }
+        assert.ok(game.phase !== 'playing' || game.lastHitter === side, `${difficulty}/${side}/${rallyAcceleration}/${rally}/${trajectory} stalled`);
+        if (trajectory === 'near-net') assert.ok(game.events.some(event => event.type === 'net' && event.grazed));
+        cases++;
+      }
+    }
+  }
+  assert.equal(cases, 108);
+});
+
+test('fast-flight forecasts allow less real time to cover the same incoming arc', () => {
+  for (const side of [0, 1]) {
+    const targets = [];
+    const startX = side ? 650 : 450;
+    for (const rallyAcceleration of [false, true]) {
+      const game = new Game({ rules: { rallyAcceleration } }); game.start();
+      game.phase = 'playing'; game.rally = 25; game.lastHitter = 1 - side;
+      game.players[side].x = startX;
+      Object.assign(game.shuttle, { x: side ? 660 : 440, y: 220, vx: side ? 500 : -500, vy: 50, active: true });
+      const ai = new BadmintonAI({ side, difficulty: 'hard' });
+      targets.push(ai.intercept(game));
+    }
+    // The capped ball reaches the back court sooner. A player with unchanged
+    // running speed must target an earlier recovery, not chase the normal arc.
+    assert.ok(Math.abs(targets[1] - startX) < Math.abs(targets[0] - startX) - 40, JSON.stringify({ side, targets }));
+  }
+});
+
+test('rally acceleration does not shorten AI reaction time', () => {
+  for (const difficulty of DIFFICULTIES) for (const side of [0, 1]) {
+    const firstMovement = [];
+    for (const rallyAcceleration of [false, true]) {
+      const game = incomingShot(side, SHOTS[1]);
+      game.setRules({ ...game.rules, rallyAcceleration }); game.rally = 25;
+      const ai = new BadmintonAI({ side, difficulty, seed: 13 });
+      for (let frame = 0; frame < 60; frame++) {
+        // Observe the same visible state to isolate the AI's real-time clock.
+        const input = ai.update(game, STEP);
+        if (input.left || input.right) { firstMovement.push(frame); break; }
+      }
+    }
+    assert.equal(firstMovement.length, 2);
+    assert.equal(firstMovement[0], firstMovement[1], `${difficulty}, side ${side}: reaction changed with ball speed`);
+  }
 });

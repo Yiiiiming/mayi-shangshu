@@ -30,15 +30,19 @@ If any serve restriction is selected, choose whether serves should **automatical
 
 **Repeated hits** are **on by default**. This lets you hit the shuttle again while it remains in your own half and has not yet cleared the net after your previous shot. Normal swing cooldowns still apply. With either setting, a shuttle that has crossed the net and then rebounded off a back wall can still be rescued after it returns to your own half.
 
+**Long-rally acceleration** is **on by default** and can be disabled in the fourth rule option. The serve counts as hit 1. On hit 10, a brief message warns that the shuttle will get faster; from hit 11, every successful contact adds 4% of the original speed, up to 1.6×. Each point restores normal speed. Player movement is unchanged, and no speed meter stays on screen. This choice persists through restarts and language changes.
+
 **Serving:** hold your swing button to charge, then release to serve. With Open serve rules and normal serving position, a tap sends the shuttle just past the net, a medium charge sends it deeper, and a full charge reaches the opposite back wall. Automatic assistance narrows this range to legal serves when restrictions are enabled. Full charge takes about 1.2 seconds and never fires automatically. Only the serving player can charge; the power button does nothing during serving. Release any button held from the previous rally before charging again. Pausing, switching windows, or interrupted touch input cancels the charge; release and press again to start a new one.
 
 **Characters:** Breeze (classic) has standard stats; Bolt (robot) has 10% more shot power; Shadow (ninja) moves 10% faster; Nova (astronaut) jumps 10% higher. Robot shot power applies to normal and power returns, while all characters keep the original serve strength and charge range. Both players may pick the same character. Choices and abilities persist through restarts and language changes, and each character keeps the player’s blue or red team color.
 
-**Venues:** choose Night arena, Classic court or Sunset valley below the character choices. All three share the same court size, walls and rules, with no courtside advertising boards. Venue choices survive restarts and language changes, and can only change before or after a match.
+**Venues:** Classic court is selected by default. Choose Classic court, Sunset valley, Coastal breeze, Bamboo grove or Alpine lake below the character choices. All five share the same court size, walls and rules, with no courtside advertising boards. Venue choices survive restarts and language changes, and can only change before or after a match.
+
+**Court markings:** the floor uses the standard 13.4 m × 6.1 m layout, with 5.18 m singles sidelines, short service lines 1.98 m from the net and doubles long service lines 0.76 m inside the back boundaries. These dimensions are shown in a side perspective. Drawn service lines, serve positioning and service-line checks share the same geometry. The game retains its arcade scoring and rebound walls. The net has fine suspended mesh, a gently sagging white tape and slender posts. Dimensions follow [BWF Laws of Badminton, Diagram A](https://extranet.bwf.sport/docs/document-system/81/1466/1470/Section%204.1%20-%20Laws%20of%20Badminton%20-%2026%20April%202025%20V5.0%20%282%29%20.pdf).
 
 **Shot feedback:** the player bends the elbow and turns through contact, follow-through and recovery. Power shots leave a continuous red trail, including after wall rebounds; the next normal return switches it back to white. Only serving displays a charge meter.
 
-**Rallies:** hold S / ↓ (or F / K, or the touch swing button) to charge, then release to swing. A tap retains the original return strength; a longer hold adds distance gradually, up to 30% farther at full charge after about 0.75 seconds. Serving keeps its existing wider range, 1.2-second charge and visible charge meter. Normal rally shots do not display a meter. Holding at full charge waits for release and does not swing repeatedly. Move or jump while charging and release as the shuttle comes within reach. Contact position and height, your movement, and the incoming shuttle still affect the return: front contacts tend to be faster and flatter; behind-body and low contacts produce higher recovery shots. E / slash remains an immediate power shot without charging; a clean contact can reach the opposite back wall. Very late, low contact beside the net can still fail. Pausing, switching language or windows, a point ending, and interrupted touch input clear the current charge so it cannot fire later.
+**Rallies:** hold S / ↓ (or F / K, or the touch swing button) to charge, then release to swing. A tap retains the original return strength; a longer hold adds distance gradually, up to 30% farther at full charge after about 0.75 seconds. Serving keeps its existing wider range, 1.2-second charge and visible charge meter. Normal rally shots do not display a meter. Holding at full charge waits for release and does not swing repeatedly. Move or jump while charging and release as the shuttle comes within reach. Releasing movement keys in the air leaves a little momentum. A light brush against the net tape can slow the shuttle and bounce it over; hitting the net body still stalls the shuttle and makes it drop. Contact position and height, your movement, and the incoming shuttle still affect the return: front contacts tend to be faster and flatter; behind-body and low contacts produce higher recovery shots. E / slash remains an immediate power shot without charging; a clean contact can reach the opposite back wall. Very late, low contact beside the net can still fail. Pausing, switching language or windows, a point ending, and interrupted touch input clear the current charge so it cannot fire later.
 
 **Power shot stock:** each player starts a match with 3 power shots. A successful power contact uses 1; swinging at empty air costs nothing. Every 3 successful rally hits by that player, including normal and power shots, earn 1 more, with no stock limit. Serves do not count. The scoreboard shows each player's remaining stock and progress toward the next charge. At zero stock, E / slash still returns the shuttle as a normal shot. Stock and progress carry across points. When the score first reaches **10–10**, an animated announcement unlocks **unlimited power shots for both players for the rest of the match**. Starting a new match restores 3 each.
 
@@ -74,15 +78,19 @@ If any serve restriction is selected, choose whether serves should **automatical
 
 **允许连击**默认**开启**。开启后，自己击球后，如果球仍在自己半场、尚未成功过网，可以再次击球；仍需要等待正常挥拍间隔。不论是否允许连击，球成功越网后撞墙、再回到自己半场时，都可以再次救球。
 
+**长回合加速**默认**开启**，可在规则菜单第 4 项关闭。发球算第 1 拍，第 10 拍时短暂提示球速即将加快；从第 11 拍开始，每次成功击球增加原球速的 4%，最高 1.6 倍。每一分结束后恢复正常，只加快球速，不改变人物移动速度；比赛中不常驻显示速度。重新开局和切换语言会保留此选项。
+
 **蓄力发球：**按住自己的挥拍键蓄力，松开发球。选择自由发球规则、正常发球站位下，轻点发到网前，中等蓄力发到后场，蓄满可以打到对面后墙。启用自动符合规则后，发球范围会按所选限制调整。约 1.2 秒蓄满，满力后仍需松开发出。只有发球方能蓄力，大力击球键在发球阶段无效。若上一回合一直按住挥拍键，需要先松开再重新蓄力。暂停、切换窗口或触控中断会取消蓄力；回来后松开并重新按下即可。
 
 **角色选择：**追风（经典运动员）为标准属性；小铁（机器人）击球力量 +10%；影刃（忍者）移动速度 +10%；星跃（宇航员）跳跃高度 +10%。机器人的加成作用于普通回球和大力击球，所有角色的发球力度与蓄力范围保持原样。双方可以选同一角色，重开和切换语言会保留角色与能力；角色保留蓝方或红方配色，方便区分。
 
-**场馆选择：**角色下方可以选择夜幕球馆、经典绿场或落日山谷。三个场馆的场地大小、两侧墙壁和比赛规则相同，只改变场景，场内均不设广告牌。重新开局和切换语言会保留场馆；只能在开局前或比赛结束后更换。
+**场馆选择：**默认选中经典绿场。角色下方可以选择经典绿场、落日山谷、海风球场、竹影球场或雪峰湖畔。五个场馆的场地大小、两侧墙壁和比赛规则相同，只改变场景，场内均不设广告牌。重新开局和切换语言会保留场馆；只能在开局前或比赛结束后更换。
+
+**场地标线：**地板按标准 13.4 米 × 6.1 米布局绘制，单打宽 5.18 米，前发球线距网 1.98 米，双打后发球线距底线 0.76 米，再以侧面透视呈现。地上的发球线、发球站位和过线判定使用同一组几何数据；游戏仍保留街机计分和墙壁反弹。球网采用悬挂细网格、轻垂白色包边与细网柱。尺寸依据上方链接的 BWF《羽毛球竞赛规则》图 A。
 
 **击球反馈：**挥拍包含弯肘、转肩、触球、随挥和回位。大力球带有连续红色拖尾，碰墙反弹后仍保留；下一次普通回球恢复白色拖尾。仅发球时显示蓄力进度条。
 
-**回合蓄力击球：**按住 S / ↓（或 F / K、触屏挥拍按钮）蓄力，松开挥拍。轻点就有加入蓄力前的原力度，按得越久只会适度增加距离，约 0.75 秒蓄满，最远增加 30%。发球保留原有的大范围距离调节、1.2 秒蓄满时间和蓄力条；普通回合不显示进度条。满力后仍需松开，按住不会自动连续挥拍。可以一边移动或跳跃一边蓄力，在球进入击球范围时松开。人与球的相对位置、击球高度、跑动和来球速度仍会改变出球：身前击球偏平快，身后和低位击球偏高弧线救球。蓝方 E、红方 / 仍为立即打出大力球，无需蓄力，正常触球能冲到对面后墙；贴网过低、出手过晚仍可能下网。暂停、切换语言或窗口、回合结束和触控中断都会清空当前蓄力，避免之后意外出手。
+**回合蓄力击球：**按住 S / ↓（或 F / K、触屏挥拍按钮）蓄力，松开挥拍。轻点就有加入蓄力前的原力度，按得越久只会适度增加距离，约 0.75 秒蓄满，最远增加 30%。发球保留原有的大范围距离调节、1.2 秒蓄满时间和蓄力条；普通回合不显示进度条。满力后仍需松开，按住不会自动连续挥拍。可以一边移动或跳跃一边蓄力，在球进入击球范围时松开。空中松开方向键会保留小幅惯性。浅擦网带时，球可能减速弹起过网；撞到网身仍会失速下坠。人与球的相对位置、击球高度、跑动和来球速度仍会改变出球：身前击球偏平快，身后和低位击球偏高弧线救球。蓝方 E、红方 / 仍为立即打出大力球，无需蓄力，正常触球能冲到对面后墙；贴网过低、出手过晚仍可能下网。暂停、切换语言或窗口、回合结束和触控中断都会清空当前蓄力，避免之后意外出手。
 
 **大力击球次数：**每人开局有 3 次，成功打出大力球消耗 1 次，挥空不扣次数。每人每成功回击 3 下球（普通和大力击球都算，发球不算），增加 1 次，次数没有上限。比分牌显示双方剩余次数和补充进度，次数与进度会保留到下一回合。用完后，按 E / 仍可普通击球。比分第一次到 **10–10** 时，会播放动画提示：**双方在本场剩余时间内都可无限大力击球**。重新开局后恢复为每人 3 次。
 
@@ -101,7 +109,7 @@ python3 -m http.server 8765
 ## Checks / 验证
 
 ```sh
-node --test engine.test.mjs ui.test.mjs ai.test.mjs
+node --test engine.test.mjs ui.test.mjs ai.test.mjs court.test.mjs
 ```
 
 `engine.mjs` handles physics, scoring, and match state. `ai.mjs` controls the computer through the same inputs as a player. `game.mjs` handles drawing, controls, audio, language, and UI. Losing window focus automatically pauses the game; sound preferences stay on your device.

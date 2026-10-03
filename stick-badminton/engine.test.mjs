@@ -1,11 +1,27 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Game, WORLD } from './engine.mjs';
+import { Game, WORLD, RALLY_ACCELERATION } from './engine.mjs';
+import { COURT_METERS, COURT_WORLD, courtWorldX } from './court.mjs';
 
 // Historical physics fixtures explicitly use open, manual serves and no combos.
 // The actual entry defaults are covered separately below.
 const OPEN_RULES = { allowServeWall: true, requireServiceLine: false, autoLegalServe: false, allowCombo: false };
 const createGame = (options = {}) => new Game({ ...options, rules: { ...OPEN_RULES, ...options.rules } });
+
+test('regulation court proportions define one shared pair of service lines for drawing and rules', () => {
+  assert.deepEqual(COURT_METERS, { length: 13.4, width: 6.1, singlesWidth: 5.18, shortService: 1.98, longServiceInset: 0.76, lineWidth: 0.04 });
+  assert.ok(Object.isFrozen(COURT_METERS) && Object.isFrozen(COURT_WORLD));
+  assert.equal(courtWorldX(0), 62);
+  assert.equal(courtWorldX(COURT_METERS.length), 1038);
+  assert.equal(courtWorldX(COURT_METERS.length / 2), WORLD.netX);
+  assert.equal(WORLD.floorY, COURT_WORLD.floorY);
+  assert.equal(WORLD.serviceLineLeft, COURT_WORLD.serviceLineLeft);
+  assert.equal(WORLD.serviceLineRight, COURT_WORLD.serviceLineRight);
+  assert.ok(Math.abs((WORLD.netX - WORLD.serviceLineLeft) / COURT_WORLD.scale - 1.98) < 1e-10);
+  assert.ok(Math.abs((WORLD.serviceLineRight - WORLD.netX) / COURT_WORLD.scale - 1.98) < 1e-10);
+  assert.ok(Math.abs(WORLD.serviceLineLeft - 405.7850746268657) < 1e-8);
+  assert.ok(Math.abs(WORLD.serviceLineLeft + WORLD.serviceLineRight - WORLD.width) < 1e-8);
+});
 
 function advance(game, seconds, inputs = []) {
   for (let frame = 0; frame < Math.ceil(seconds * 120); frame += 1) game.update(1 / 120, inputs);
@@ -79,6 +95,109 @@ test('movement stays on each half and holding jump does not auto-bounce', () => 
   game.update(1 / 60, [{ jump: false }]);
   game.update(1 / 60, [{ jump: true }]);
   assert.ok(game.players[0].y < WORLD.floorY);
+});
+
+test('releasing movement in the air preserves a little momentum with mirrored character-scaled braking', () => {
+  const distances = {};
+  for (const character of ['classic', 'ninja']) for (const side of [0, 1]) for (const airborne of [false, true]) {
+    const game = createGame({ characters: [character, character] });
+    game.start(); game.phase = 'playing';
+    const direction = side ? -1 : 1;
+    const origin = side ? 900 : 200;
+    Object.assign(game.players[side], {
+      x: origin, y: airborne ? 400 : WORLD.floorY,
+      vx: direction * 365 * game.players[side].stats.speed, vy: 0,
+    });
+    Object.assign(game.shuttle, { x: 550, y: 120, vx: 0, vy: 0, active: true });
+    advance(game, 0.3);
+    assert.equal(game.players[side].vx, 0);
+    distances[`${character}-${side}-${airborne}`] = (game.players[side].x - origin) * direction;
+  }
+  const grounded = distances['classic-0-false'];
+  const airborne = distances['classic-0-true'];
+  assert.ok(grounded > 19 && grounded < 22, `ground coast: ${grounded}`);
+  assert.ok(airborne > grounded * 1.9 && airborne < grounded * 2.1, `air coast: ${airborne}`);
+  for (const airborne of [false, true]) {
+    assert.ok(Math.abs(distances[`classic-0-${airborne}`] - distances[`classic-1-${airborne}`]) < 1e-8);
+    assert.ok(Math.abs(distances[`ninja-0-${airborne}`] / distances[`classic-0-${airborne}`] - 1.1) < 1e-8);
+  }
+});
+
+test('active direction changes retain the same responsiveness in the air and on the ground', () => {
+  for (const side of [0, 1]) {
+    const results = [];
+    for (const airborne of [false, true]) {
+      const game = createGame(); game.start(); game.phase = 'playing';
+      Object.assign(game.players[side], { x: side ? 800 : 300, y: airborne ? 400 : 500, vx: side ? -365 : 365, vy: 0 });
+      Object.assign(game.shuttle, { x: 550, y: 120, vx: 0, vy: 0, active: true });
+      const inputs = [{}, {}]; inputs[side] = side ? { right: true } : { left: true };
+      advance(game, 0.15, inputs);
+      results.push(game.players[side].vx);
+    }
+    assert.equal(results[0], results[1]);
+    assert.ok(side ? results[1] > 0 : results[1] < 0, 'a deliberate reversal should already change travel direction');
+  }
+});
+
+function tapeContact(side, crossingHeight = 313, rules = {}) {
+  const game = createGame({ rules });
+  game.start(); game.phase = 'playing'; game.lastHitter = side; game.rally = 1;
+  const direction = side ? -1 : 1;
+  Object.assign(game.shuttle, { x: WORLD.netX - direction * 2, y: crossingHeight, vx: direction * 400, vy: 0, active: true });
+  return game;
+}
+
+test('a shallow tape graze tumbles across once, mirrors between sides, and scores on the landing side', () => {
+  const left = tapeContact(0);
+  const right = tapeContact(1);
+  for (const game of [left, right]) game.update(1 / 120);
+  assert.ok(Math.abs(left.shuttle.vx - 220) < 1e-8);
+  assert.ok(Math.abs(right.shuttle.vx + 220) < 1e-8);
+  assert.equal(left.shuttle.vy, -35);
+  assert.equal(right.shuttle.vy, -35);
+  assert.equal(left.shuttle.x + right.shuttle.x, WORLD.width);
+  assert.equal(left.shuttle.y, right.shuttle.y);
+  for (const [side, game] of [[0, left], [1, right]]) {
+    assert.equal(game._crossedNetSinceHit, true);
+    assert.equal(game.pointReason, '');
+    advance(game, 0.95);
+    assert.equal(game.phase, 'point');
+    assert.equal(game.score[side], 1);
+    assert.equal(game.pointReason, '落地得分');
+    assert.deepEqual(game.events.filter((event) => event.type === 'net'), [{ type: 'net', player: side, grazed: true }]);
+    assert.equal(game.events.filter((event) => event.type === 'point').length, 1);
+  }
+});
+
+test('tape grazes preserve short-serve rules and deeper net contacts still fall back', () => {
+  for (const side of [0, 1]) {
+    const served = tapeContact(side, 313, { requireServiceLine: true });
+    // Keep this a genuinely short serve after changes to regulation geometry.
+    served.shuttle.vx = (side ? -1 : 1) * (WORLD.serviceLineRight - WORLD.netX);
+    served._serveFlightActive = true; served._serveOrigin = side;
+    advance(served, 1);
+    assert.equal(served.pointReason, 'serve-short');
+    assert.equal(served.score[1 - side], 1);
+    assert.equal(served.events.filter((event) => event.type === 'point').length, 1);
+    const netted = tapeContact(side, 316);
+    netted.update(1 / 120);
+    assert.ok(side ? netted.shuttle.x > WORLD.netX : netted.shuttle.x < WORLD.netX);
+    assert.equal(netted._crossedNetSinceHit, false);
+    assert.equal(netted.events.find((event) => event.type === 'net').grazed, undefined);
+    advance(netted, 1);
+    assert.equal(netted.score[1 - side], 1);
+    assert.equal(netted.pointReason, '下网');
+  }
+});
+
+test('tape contact is stable across common display frame rates without repeated bounces', () => {
+  for (const dt of [1 / 30, 1 / 60, 1 / 120, 1 / 240]) for (const side of [0, 1]) {
+    const game = tapeContact(side);
+    for (let frame = 0; frame < Math.ceil(1 / dt) && game.phase === 'playing'; frame++) game.update(dt);
+    assert.equal(game.score[side], 1, `dt=${dt}, side=${side}`);
+    assert.equal(game.events.filter((event) => event.type === 'net').length, 1);
+    assert.equal(game.events.filter((event) => event.type === 'point').length, 1);
+  }
 });
 
 test('a below-tape shot bounces back and awards the opposing player', () => {
@@ -709,8 +828,8 @@ test('reset and a new match restore three charges and leave unlimited mode', () 
   }
 });
 
-function launchConfiguredServe({ side = 0, charge = 0, rules = {}, x = 265, y = 500, vx = 0, vy = 0 } = {}) {
-  const game = createGame({ rules });
+function launchConfiguredServe({ side = 0, charge = 0, rules = {}, x = 265, y = 500, vx = 0, vy = 0, character = 'classic' } = {}) {
+  const game = createGame({ rules, characters: [character, character] });
   game.start();
   game.server = side;
   const direction = side === 0 ? 1 : -1;
@@ -733,13 +852,13 @@ function finishFlight(game) {
 }
 
 test('match rules have explicit defaults, normalized values, and survive reset and new matches', () => {
-  const defaults = { allowServeWall: false, requireServiceLine: false, autoLegalServe: true, allowCombo: true };
+  const defaults = { allowServeWall: false, requireServiceLine: false, autoLegalServe: true, allowCombo: true, rallyAcceleration: true };
   const game = new Game();
   assert.deepEqual(game.rules, defaults);
   assert.equal(game.autoLegalServeActive, true);
   assert.equal(game.serveFlightActive, false);
   assert.deepEqual(game.setRules({ allowServeWall: false, requireServiceLine: true, autoLegalServe: true, allowCombo: true }),
-    { allowServeWall: false, requireServiceLine: true, autoLegalServe: true, allowCombo: true });
+    { allowServeWall: false, requireServiceLine: true, autoLegalServe: true, allowCombo: true, rallyAcceleration: true });
   const rules = game.rules;
   assert.ok(Object.isFrozen(rules));
   game.start();
@@ -794,12 +913,17 @@ test('manual rule restrictions and automatic mode with no restrictions preserve 
 
 test('automatic serve trajectories satisfy each restricted mode from every legal position, jump height, momentum, and charge', () => {
   let simulations = 0;
+  const characters = ['classic', 'ninja', 'robot', 'astro'];
+  const positions = [COURT_WORLD.left, 150, 265, 300, WORLD.serviceLineLeft - 0.01, WORLD.serviceLineLeft, WORLD.serviceLineLeft + 0.01, 450, WORLD.netX - 37];
   for (const side of [0, 1]) for (const restriction of [
     { allowServeWall: false }, { requireServiceLine: true }, { allowServeWall: false, requireServiceLine: true },
-  ]) for (const x of [62, 150, 265, 300, 450, 513]) for (const y of [500, 435, 375.3])
+  ]) for (const character of characters) for (const x of positions)
+    for (const y of [500, 435, 500 - 670 ** 2 * (character === 'astro' ? 1.1 : 1) / (2 * 1800)])
     for (const [vx, vy] of [[-365, -670], [0, 0], [365, 670]]) for (const charge of [0, 0.25, 0.5, 0.75, 1]) {
-      const game = launchConfiguredServe({ side, charge, x, y, vx, vy, rules: { ...restriction, autoLegalServe: true } });
-      const context = JSON.stringify({ side, restriction, x, y, vx, vy, charge });
+      const game = launchConfiguredServe({ side, charge, x, y,
+        vx: vx * (character === 'ninja' ? 1.1 : 1), vy: vy * Math.sqrt(character === 'astro' ? 1.1 : 1),
+        character, rules: { ...restriction, autoLegalServe: true } });
+      const context = JSON.stringify({ side, restriction, character, x, y, vx, vy, charge });
       assert.ok(side === 0 ? game.players[side].x <= WORLD.serviceLineLeft : game.players[side].x >= WORLD.serviceLineRight, context);
       const apex = finishFlight(game);
       assert.ok(apex >= 103.9, `serve arc must remain visible: ${apex}, ${context}`);
@@ -810,7 +934,7 @@ test('automatic serve trajectories satisfy each restricted mode from every legal
       if (restriction.requireServiceLine) assert.equal(game.serveReachedLine, true, context);
       simulations += 1;
     }
-  assert.equal(simulations, 1620);
+  assert.equal(simulations, 9720);
 });
 
 test('automatic serving keeps a meaningful charge range and only constrains the server until the serve launches', () => {
@@ -841,12 +965,45 @@ test('automatic serving keeps a meaningful charge range and only constrains the 
   }
 });
 
+test('automatic serves from the moved front limit retain their exact planned short and deep landings', () => {
+  for (const side of [0, 1]) for (const requireServiceLine of [false, true]) for (const charge of [0, 0.25, 0.5, 0.75, 1]) {
+    const game = launchConfiguredServe({ side, charge, x: WORLD.serviceLineLeft,
+      rules: { allowServeWall: false, requireServiceLine, autoLegalServe: true } });
+    const near = requireServiceLine ? WORLD.serviceLineRight + 18 : WORLD.netX + 120;
+    const far = WORLD.wallRight - 28;
+    const intendedFromLeft = near + (far - near) * charge;
+    const intended = side === 0 ? intendedFromLeft : WORLD.width - intendedFromLeft;
+    const { x, y, vx, vy } = game.shuttle;
+    const landingTime = (-vy + Math.sqrt(vy * vy + 2 * 680 * (WORLD.floorY - 4 - y))) / 680;
+    assert.ok(Math.abs(x + vx * landingTime - intended) < 1e-8, 'automatic launch must not clamp away its planned landing');
+    finishFlight(game);
+    assert.ok(Math.abs(game.shuttle.x - intended) < 2);
+    assert.equal(game.score[side], 1);
+  }
+});
+
+test('short-serve adjudication uses the moved service line with the same exact boundary on both sides', () => {
+  for (const side of [0, 1]) for (const beyondLine of [-0.02, 0, 0.02]) {
+    const game = launchConfiguredServe({ side, rules: { requireServiceLine: true } });
+    const direction = side === 0 ? 1 : -1;
+    const line = side === 0 ? WORLD.serviceLineRight : WORLD.serviceLineLeft;
+    Object.assign(game.shuttle, { x: line + direction * beyondLine, y: 494, vx: 0, vy: 200 });
+    game.update(1 / 60);
+    assert.equal(game.phase, 'point');
+    assert.equal(game.serveReachedLine, beyondLine >= 0);
+    assert.equal(game.pointReason, beyondLine < 0 ? 'serve-short' : '落地得分');
+    assert.equal(game.score[beyondLine < 0 ? 1 - side : side], 1);
+    assert.equal(game.events.filter((event) => event.type === 'point').length, 1);
+  }
+});
+
 test('reaching the service line counts even when the unreturned serve rebounds short of that line', () => {
   for (const side of [0, 1]) {
     const game = launchConfiguredServe({ side, charge: 1, rules: { requireServiceLine: true } });
     for (let frame = 0; frame < 600 && !game.events.some((event) => event.type === 'wall'); frame += 1) game.update(1 / 120);
     assert.equal(game.serveReachedLine, true);
-    Object.assign(game.shuttle, { x: side === 0 ? 700 : 400, y: 494, vx: 0, vy: 200 });
+    const shortX = (WORLD.netX + (side === 0 ? WORLD.serviceLineRight : WORLD.serviceLineLeft)) / 2;
+    Object.assign(game.shuttle, { x: shortX, y: 494, vx: 0, vy: 200 });
     game.update(1 / 60);
     assert.equal(game.score[side], 1);
     assert.equal(game.pointReason, '落地得分');
@@ -858,7 +1015,8 @@ test('an early receiving contact ends serve restrictions and later rally wall re
     const receiver = 1 - side;
     const game = launchConfiguredServe({ side, charge: 0, rules: { allowServeWall: false, requireServiceLine: true } });
     const player = game.players[receiver];
-    player.x = receiver === 0 ? 450 : 650;
+    const earlyContactX = (WORLD.netX + (receiver === 0 ? WORLD.serviceLineLeft : WORLD.serviceLineRight)) / 2;
+    player.x = earlyContactX - player.facing * 25;
     player._attackBuffer = 0.18;
     Object.assign(game.shuttle, { x: player.x + player.facing * 25, y: 410, vx: 0, vy: 0 });
     game._tryHits();
@@ -929,7 +1087,7 @@ test('own combos keep serve restrictions active and cannot turn a prohibited wal
     assert.equal(game.rally, 2);
     assert.equal(game.serveFlightActive, true);
     if (violation === 'serve-wall') Object.assign(game.shuttle, { x: 30, y: 300, vx: -600, vy: 0 });
-    else Object.assign(game.shuttle, { x: 650, y: 494, vx: 0, vy: 200 });
+    else Object.assign(game.shuttle, { x: (WORLD.netX + WORLD.serviceLineRight) / 2, y: 494, vx: 0, vy: 200 });
     game.update(1 / 60);
     assert.equal(game.pointReason, violation);
     assert.deepEqual(game.score, [0, 1]);
@@ -1142,4 +1300,169 @@ test('serving cannot carry the receivers held hit into a charged return', () => 
   assert.equal(game.players[1]._attackBuffer, 0);
   holdRallyCharge(game, 1, 0.1); game.update(1 / 120);
   assert.equal(game.lastHitter, 1);
+});
+
+test('rally acceleration starts after ten contacts, caps at 1.6, and stays idle outside play', () => {
+  const game = new Game();
+  assert.equal(game.rules.rallyAcceleration, true);
+  assert.deepEqual(RALLY_ACCELERATION, { after: 10, step: 0.04, max: 1.6 });
+  assert.ok(Object.isFrozen(RALLY_ACCELERATION));
+  game.phase = 'playing';
+  for (const [rally, expected] of [[0, 1], [9, 1], [10, 1], [11, 1.04], [12, 1.08], [24, 1.56], [25, 1.6], [200, 1.6]]) {
+    game.rally = rally;
+    assert.ok(Math.abs(game.rallySpeed - expected) < 1e-10);
+  }
+  for (const phase of ['ready', 'serve', 'point', 'over']) {
+    game.phase = phase;
+    assert.equal(game.rallySpeed, 1);
+  }
+});
+
+test('the serve is contact one and only successful normal or power contacts advance rally speed', () => {
+  const game = createGame(); game.start(); serve(game);
+  assert.equal(game.rally, 1);
+  assert.equal(game.rallySpeed, 1);
+  game.rally = 9;
+  rallyContact(game, 1);
+  assert.equal(game.rally, 10);
+  assert.equal(game.rallySpeed, 1);
+  rallyContact(game, 0, 'power');
+  assert.equal(game.rally, 11);
+  assert.equal(game.rallySpeed, 1.04);
+  game.rally = 24;
+  rallyContact(game, 1);
+  assert.equal(game.rallySpeed, 1.6);
+  const missed = createGame(); missed.start(); missed.phase = 'playing'; missed.rally = 10;
+  Object.assign(missed.shuttle, { x: 550, y: 120, vx: 0, vy: 0, active: true });
+  advance(missed, 0.15, [{ power: true }, {}]);
+  advance(missed, 0.1, [{ hit: true }, {}]);
+  advance(missed, 0.15);
+  assert.equal(missed.rally, 10);
+  assert.equal(missed.rallySpeed, 1);
+  assert.equal(missed.players[0].powerCharges, 3);
+  assert.equal(missed.players[0].powerProgress, 0);
+});
+
+test('contact ten warns exactly once after its hit event, with no warning for a miss or a disabled rule', () => {
+  for (const enabled of [false, true]) {
+    const game = createGame({ rules: { rallyAcceleration: enabled } });
+    game.start(); game.phase = 'playing'; game.rally = 9;
+    Object.assign(game.shuttle, { x: 550, y: 120, vx: 0, vy: 0, active: true });
+    advance(game, 0.1, [{ power: true }, {}]);
+    assert.equal(game.events.filter((event) => event.type === 'rally-speed-warning').length, 0);
+    rallyContact(game, 0);
+    assert.equal(game.rally, 10);
+    assert.equal(game.rallySpeed, 1, 'the warning comes before any acceleration');
+    if (enabled) assert.deepEqual(game.events.slice(-2).map((event) => event.type), ['hit', 'rally-speed-warning']);
+    rallyContact(game, 1, 'power');
+    assert.equal(game.events.filter((event) => event.type === 'rally-speed-warning').length, enabled ? 1 : 0);
+    landOn(game, 1);
+    advance(game, 1.5);
+    serve(game);
+    game.rally = 9;
+    rallyContact(game, 1, 'power');
+    assert.equal(game.events.filter((event) => event.type === 'rally-speed-warning').length, enabled ? 2 : 0);
+  }
+});
+
+test('finishing a point resets rally speed and disabling it persists through resets and new matches', () => {
+  const game = createGame(); game.start(); game.phase = 'playing'; game.rally = 25;
+  assert.equal(game.rallySpeed, 1.6);
+  landOn(game, 1);
+  assert.equal(game.phase, 'point');
+  assert.equal(game.rallySpeed, 1);
+  advance(game, 1.5);
+  assert.equal(game.rally, 0);
+  assert.equal(game.rallySpeed, 1);
+  serve(game);
+  assert.equal(game.rally, 1);
+  assert.equal(game.rallySpeed, 1);
+  game.rally = 25;
+  game.setRules({ ...game.rules, rallyAcceleration: false });
+  assert.equal(game.rallySpeed, 1);
+  for (const operation of ['reset', 'start']) {
+    game[operation]();
+    assert.equal(game.rules.rallyAcceleration, false);
+    game.phase = 'playing'; game.rally = 100;
+    assert.equal(game.rallySpeed, 1);
+  }
+  game.setRules({ ...game.rules, rallyAcceleration: true });
+  assert.equal(game.rallySpeed, 1.6);
+  game.start();
+  assert.equal(game.rally, 0);
+  assert.equal(game.rallySpeed, 1);
+});
+
+function acceleratedFlight(enabled, shuttle = {}) {
+  const game = createGame({ rules: { rallyAcceleration: enabled } });
+  game.start(); game.phase = 'playing'; game.rally = 25; game.lastHitter = 0;
+  Object.assign(game.shuttle, { x: 230, y: 400, vx: 440, vy: -450, active: true, ...shuttle });
+  return game;
+}
+
+test('speeding the flight clock preserves the same arc and crossing while taking less real time', () => {
+  const normal = acceleratedFlight(false);
+  const fast = acceleratedFlight(true);
+  for (let frame = 0; frame < 192; frame++) normal.update(1 / 240);
+  for (let frame = 0; frame < 120; frame++) fast.update(1 / 240);
+  for (const key of ['x', 'y', 'vx', 'vy']) assert.ok(Math.abs(normal.shuttle[key] - fast.shuttle[key]) < 1e-8, key);
+  assert.equal(normal._crossedNetSinceHit, true);
+  assert.equal(fast._crossedNetSinceHit, true);
+  assert.equal(normal.events.some((event) => event.type === 'net'), false);
+  assert.equal(fast.events.some((event) => event.type === 'net'), false);
+});
+
+test('accelerated shots keep their landing distance and simply arrive about 1.6 times sooner', () => {
+  const results = [false, true].map((enabled) => {
+    const game = acceleratedFlight(enabled, { x: 303, y: 432, vx: 330, vy: -510 });
+    let frames = 0;
+    while (game.phase === 'playing' && frames < 2000) { game.update(1 / 480); frames++; }
+    assert.equal(game.phase, 'point');
+    assert.deepEqual(game.score, [1, 0]);
+    return { x: game.shuttle.x, time: frames / 480 };
+  });
+  assert.ok(Math.abs(results[0].x - results[1].x) < 1.2);
+  assert.ok(Math.abs(results[0].time / results[1].time - 1.6) < 0.005);
+});
+
+test('rally acceleration leaves players, held charges, swing animation and cooldowns on the real clock', () => {
+  const normal = acceleratedFlight(false, { x: 550, y: 120, vx: 0, vy: 0 });
+  const fast = acceleratedFlight(true, { x: 550, y: 120, vx: 0, vy: 0 });
+  for (const game of [normal, fast]) {
+    Object.assign(game.players[0], { x: 240, y: 400, vx: 100, vy: -150, swing: 0.78, _attackCooldown: 0.29, _hitCooldown: 0.23 });
+    advance(game, 0.2, [{ right: true, hit: true }, {}]);
+  }
+  for (const key of ['x', 'y', 'vx', 'vy', 'swing', 'hitCharge', 'hitCharging', '_attackCooldown', '_hitCooldown']) {
+    assert.equal(normal.players[0][key], fast.players[0][key], key);
+  }
+  assert.ok(fast.shuttle.y > normal.shuttle.y + 15);
+});
+
+test('accelerated wall rebounds, net faults and tape clips are detected once across frame rates', () => {
+  for (const side of [0, 1]) for (const dt of [1 / 30, 1 / 60, 1 / 240]) {
+    const wall = acceleratedFlight(true, { x: side ? 1070 : 30, y: 240, vx: side ? 1250 : -1250, vy: 0 });
+    wall.update(dt);
+    assert.equal(wall.phase, 'playing');
+    assert.ok(wall.shuttle.x >= WORLD.wallLeft && wall.shuttle.x <= WORLD.wallRight);
+    assert.deepEqual(wall.events.filter((event) => event.type === 'wall'), [{ type: 'wall', side }]);
+    for (const height of [313, 360]) {
+      const net = tapeContact(side, height); net.rally = 25;
+      for (let frame = 0; frame < Math.ceil(1 / dt) && net.phase === 'playing'; frame++) net.update(dt);
+      assert.equal(net.phase, 'point');
+      assert.equal(net.events.filter((event) => event.type === 'net').length, 1);
+      assert.equal(net.events.filter((event) => event.type === 'point').length, 1);
+      assert.equal(net.score[height === 313 ? side : 1 - side], 1);
+    }
+  }
+});
+
+test('flight acceleration cannot bypass a short-serve or prohibited-wall restriction', () => {
+  for (const side of [0, 1]) for (const charge of [0, 0.5, 1]) {
+    const game = launchConfiguredServe({ side, charge, rules: { requireServiceLine: true, allowServeWall: false, allowCombo: true } });
+    game.rally = 25;
+    finishFlight(game);
+    assert.equal(game.pointReason, charge === 0 ? 'serve-short' : charge === 1 ? 'serve-wall' : '落地得分');
+    assert.equal(game.score[charge === 0.5 ? side : 1 - side], 1);
+    assert.equal(game.events.filter((event) => event.type === 'point').length, 1);
+  }
 });

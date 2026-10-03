@@ -52,9 +52,9 @@ async function setup({ language = 'zh', mode = 'local', difficulty = 'medium', c
   class Button extends Element {}
   const buttonIds = new Set(['start', 'restart', 'pause', 'sound', 'fullscreen', 'choose-zh', 'choose-en', 'lang-switch',
     'rule-serve-open', 'rule-serve-no-wall', 'rule-serve-long', 'rule-serve-strict', 'rule-auto-off', 'rule-auto-on',
-    'rule-combo-off', 'rule-combo-on', 'rules-confirm', 'rules-language', 'rules-edit',
+    'rule-combo-off', 'rule-combo-on', 'rule-rally-off', 'rule-rally-on', 'rules-confirm', 'rules-language', 'rules-edit',
     'characters-confirm', 'characters-back', 'characters-edit',
-    'venue-night', 'venue-classic', 'venue-sunset',
+    'venue-classic', 'venue-sunset', 'venue-coast', 'venue-bamboo', 'venue-lake',
     'mode-single', 'mode-local', 'difficulty-easy', 'difficulty-medium', 'difficulty-hard', 'mode-confirm', 'mode-language', 'mode-edit', 'rules-back',
     ...[0, 1].flatMap((side) => ['classic', 'ninja', 'robot', 'astro'].map((id) => `character-${side}-${id}`))]);
   const get = (id) => {
@@ -117,7 +117,7 @@ async function setup({ language = 'zh', mode = 'local', difficulty = 'medium', c
     get(`mode-${mode}`).dispatch('click'); get(`difficulty-${difficulty}`).dispatch('click'); get('mode-confirm').dispatch('click');
   }
   if (language && confirmMode && confirmRules) {
-    if (legacyRules) { get('rule-serve-open').dispatch('click'); get('rule-combo-off').dispatch('click'); }
+    if (legacyRules) { get('rule-serve-open').dispatch('click'); get('rule-combo-off').dispatch('click'); get('rule-rally-off').dispatch('click'); }
     get('rules-confirm').dispatch('click');
   }
   if (language && confirmMode && confirmRules && confirmCharacters) get('characters-confirm').dispatch('click');
@@ -280,7 +280,7 @@ test('E and Slash select ground-level power swings for their own players', async
 const dynamicIds = ['overlay-label', 'overlay-title', 'overlay-copy', 'start', 'start-hint', 'court-status',
   'announcement', 'power-label', 'power-value', 'pause', 'sound', 'fullscreen', 'fullscreen-label', 'live-status',
   'power-stock-0', 'power-stock-1', 'power-count-0', 'power-count-1', 'power-progress-0', 'power-progress-1',
-  'deuce-title', 'deuce-copy', 'rules-summary', 'power-range-near', 'power-range-far'];
+  'deuce-title', 'deuce-copy', 'rules-summary', 'rule-rally-detail', 'power-range-near', 'power-range-far'];
 function assertEnglish(h, ids = dynamicIds) {
   for (const id of ids) assert.doesNotMatch(h.text(h.get(id)), /\p{Script=Han}/u, `Chinese leaked into #${id}`);
 }
@@ -332,7 +332,7 @@ test('every page entry requires language, mode, rules and character confirmation
   }
 });
 
-const defaultRules = Object.freeze({ allowServeWall: false, requireServiceLine: false, autoLegalServe: true, allowCombo: true });
+const defaultRules = Object.freeze({ allowServeWall: false, requireServiceLine: false, autoLegalServe: true, allowCombo: true, rallyAcceleration: true });
 const serveChoices = [
   ['open', true, false], ['no-wall', false, false], ['long', true, true], ['strict', false, true],
 ];
@@ -347,6 +347,7 @@ test('rules menu defaults to no-wall serves with automatic assistance and consec
   assert.equal(h.get('rule-serve-no-wall').attributes.get('aria-pressed'), 'true');
   assert.equal(h.get('rule-auto-on').attributes.get('aria-pressed'), 'true');
   assert.equal(h.get('rule-combo-on').attributes.get('aria-pressed'), 'true');
+  assert.equal(h.get('rule-rally-on').attributes.get('aria-pressed'), 'true');
   assert.equal(h.get('serve-assist-options').hidden, false);
   click(h, 'rules-confirm');
   assert.deepEqual(h.state().rules, defaultRules);
@@ -372,7 +373,7 @@ test('all four serve choices and optional assistance reach the actual game engin
       if (assisted) click(h, 'rule-auto-on');
       click(h, 'rule-combo-on');
       click(h, 'rules-confirm');
-      const expected = { allowServeWall, requireServiceLine, autoLegalServe: assisted, allowCombo: true };
+      const expected = { ...defaultRules, allowServeWall, requireServiceLine, autoLegalServe: assisted };
       assert.deepEqual(h.state().rules, expected);
       assert.deepEqual(h.engine.rules, expected);
       click(h, 'characters-confirm');
@@ -409,7 +410,7 @@ test('confirmed rules survive restart and an in-match language switch; rules can
   const h = await setup({ language: 'en', confirmRules: false, start: false });
   click(h, 'rule-serve-strict'); click(h, 'rule-auto-on'); click(h, 'rule-combo-on'); click(h, 'rules-confirm');
   click(h, 'characters-confirm');
-  const expected = { allowServeWall: false, requireServiceLine: true, autoLegalServe: true, allowCombo: true };
+  const expected = { ...defaultRules, requireServiceLine: true };
   assert.equal(h.get('rules-edit').hidden, false);
   click(h, 'start'); h.tick(36);
   assert.equal(h.get('rules-edit').hidden, true);
@@ -437,7 +438,7 @@ test('confirmed rules survive restart and an in-match language switch; rules can
   click(h, 'rules-edit');
   assert.equal(h.state().rulesOpen, true);
   click(h, 'rule-serve-open'); click(h, 'rule-combo-off'); click(h, 'rules-confirm');
-  assert.deepEqual(h.engine.rules, { allowServeWall: true, requireServiceLine: false, autoLegalServe: false, allowCombo: false });
+  assert.deepEqual(h.engine.rules, { ...defaultRules, allowServeWall: true, autoLegalServe: false, allowCombo: false });
 });
 
 test('editing rules after match end confirms a fresh ready screen without auto-starting', async () => {
@@ -1035,16 +1036,17 @@ test('single player mode and difficulty persist through pause, language and rest
 
 test('venues are selected with characters, persist across language and restart, and cannot change during play', async () => {
   const h = await setup({ language: 'en', start: false, confirmCharacters: false });
-  assert.equal(h.state().selectedVenue, 'night');
-  for (const id of ['night', 'classic', 'sunset']) {
+  assert.equal(h.state().selectedVenue, 'classic');
+  for (const id of ['classic', 'sunset', 'coast', 'bamboo', 'lake']) {
     click(h, `venue-${id}`);
     assert.equal(h.state().draftVenue, id);
-    assert.equal(h.state().selectedVenue, 'night');
+    assert.equal(h.state().selectedVenue, 'classic');
     assert.ok(h.get(`venue-preview-${id}`).innerHTML.includes('<svg'));
     assert.ok(h.get(`venue-name-${id}`).textContent.trim());
     assert.doesNotMatch(h.text(h.get(`venue-name-${id}`)), /undefined|\p{Script=Han}/u);
     assert.equal(h.get(`venue-${id}`).attributes.get('aria-pressed'), 'true');
   }
+  click(h, 'venue-sunset');
   click(h, 'characters-confirm');
   assert.equal(h.state().selectedVenue, 'sunset');
   click(h, 'start'); click(h, 'venue-classic');
@@ -1057,4 +1059,109 @@ test('venues are selected with characters, persist across language and restart, 
   assert.equal(h.state().draftVenue, 'sunset');
   click(h, 'venue-classic'); click(h, 'characters-confirm');
   assert.equal(h.state().selectedVenue, 'classic');
+});
+
+test('long-rally rule is a confirmed choice that survives language changes and restart', async () => {
+  const h = await setup({ language: 'en', start: false, confirmRules: false });
+  assert.equal(h.engine.rules.rallyAcceleration, true);
+  assert.equal(h.get('rule-rally-on').attributes.get('aria-pressed'), 'true');
+  const source = await readFile(new URL('./game.mjs', import.meta.url), 'utf8');
+  const enginePath = source.match(/from ['"]([^'"]*engine\.mjs[^'"]*)['"]/)[1];
+  const { RALLY_ACCELERATION } = await import(new URL(enginePath, import.meta.url));
+  const { locales } = await import('./locales.mjs');
+  assert.equal(h.get('rule-rally-detail').textContent, locales.en.ruleRallyOnDetail(RALLY_ACCELERATION));
+  click(h, 'rule-rally-off');
+  assert.equal(h.engine.rules.rallyAcceleration, true, 'Draft rules must wait for confirmation');
+  click(h, 'rules-language'); click(h, 'choose-zh');
+  assert.equal(h.get('rule-rally-off').attributes.get('aria-pressed'), 'true');
+  assert.equal(h.get('rule-rally-detail').textContent, locales.zh.ruleRallyOnDetail(RALLY_ACCELERATION));
+  click(h, 'rules-confirm'); click(h, 'characters-confirm');
+  assert.equal(h.engine.rules.rallyAcceleration, false);
+  assert.match(h.get('rules-summary').textContent, /长回合加速关/);
+  click(h, 'start'); click(h, 'rule-rally-on'); click(h, 'rules-confirm');
+  assert.equal(h.engine.rules.rallyAcceleration, false, 'Hidden setup controls cannot change an active match');
+  click(h, 'lang-switch'); click(h, 'choose-en');
+  assert.equal(h.state().paused, true);
+  assert.equal(h.engine.rules.rallyAcceleration, false);
+  assert.match(h.get('rules-summary').textContent, /Rally speed-up off/);
+  click(h, 'restart'); click(h, 'rules-edit');
+  assert.equal(h.get('rule-rally-off').attributes.get('aria-pressed'), 'true');
+  click(h, 'rule-rally-on'); click(h, 'rules-confirm'); click(h, 'characters-confirm');
+  assert.equal(h.engine.rules.rallyAcceleration, true);
+  assert.match(h.get('rules-summary').textContent, /Rally speed-up on/);
+  assertEnglish(h);
+});
+
+test('hit ten briefly warns in the chosen language without a permanent speed display', async () => {
+  const { locales } = await import('./locales.mjs');
+  for (const language of ['en', 'zh']) {
+    const h = await setup({ language, legacyRules: false });
+    h.key('keydown', 'KeyS'); h.tick(6); h.key('keyup', 'KeyS'); h.tick();
+    assert.equal(h.engine.rally, 1, 'The serve is hit one');
+    for (let hit = 2; hit <= 9; hit++) makeContact(h, (hit - 1) % 2);
+    assert.equal(h.engine.rally, 9);
+    assert.equal(h.get('announcement').textContent, '');
+    makeContact(h, 1, true);
+    assert.equal(h.engine.rally, 10);
+    assert.equal(h.engine.rallySpeed, 1);
+    assert.equal(h.get('announcement').textContent, locales[language].rallySpeedWarning);
+    makeContact(h, 0, true);
+    assert.equal(h.engine.rally, 11);
+    assert.ok(h.engine.rallySpeed > 1);
+    assert.equal(h.get('announcement').textContent, locales[language].rallySpeedWarning, 'A subsequent power shot must not erase the warning immediately');
+    click(h, 'pause'); h.tick(180); click(h, 'start');
+    assert.equal(h.get('announcement').textContent, locales[language].rallySpeedWarning, 'Paused time does not expire the notice');
+    // Keep the shuttle aloft while the real frame clock expires the notice.
+    for (let i = 0; i < 5; i++) {
+      Object.assign(h.engine.shuttle, { x: 230, y: 150, vx: 0, vy: -100 });
+      h.tick(30);
+    }
+    assert.equal(h.engine.phase, 'playing');
+    assert.equal(h.get('announcement').textContent, '', 'The notice disappears after two seconds');
+    makeContact(h, 1);
+    assert.equal(h.get('announcement').textContent, '', 'Later hits do not repeat the warning');
+    assert.equal(h.elements.has('rally-speed'), false, 'No constant multiplier display is added');
+    Object.assign(h.engine.shuttle, { x: 800, y: 499, vx: 0, vy: 200 }); h.tick(2);
+    assert.equal(h.engine.phase, 'point');
+    assert.equal(h.engine.rallySpeed, 1);
+    h.tick(110);
+    assert.equal(h.engine.phase, 'serve');
+    const key = h.engine.server === 0 ? 'KeyS' : 'ArrowDown';
+    h.key('keydown', key); h.tick(6); h.key('keyup', key); h.tick();
+    const receiver = 1 - h.engine.server;
+    for (let hit = 2; hit <= 10; hit++) makeContact(h, (receiver + hit - 2) % 2);
+    assert.equal(h.engine.rally, 10);
+    assert.equal(h.get('announcement').textContent, locales[language].rallySpeedWarning, 'A new point can show the notice again');
+    if (language === 'en') assertEnglish(h);
+  }
+});
+
+test('disabled long-rally acceleration neither speeds the shuttle nor announces a warning', async () => {
+  const h = await setup({ language: 'en', confirmRules: false, start: false });
+  click(h, 'rule-rally-off'); click(h, 'rules-confirm'); click(h, 'characters-confirm'); click(h, 'start');
+  for (let hit = 1; hit <= 13; hit++) {
+    makeContact(h, hit % 2);
+    assert.equal(h.engine.rally, hit);
+    assert.equal(h.engine.rallySpeed, 1);
+    assert.equal(h.get('announcement').textContent, '');
+  }
+});
+
+test('Classic is the default venue and five scenic choices are complete in both languages', async () => {
+  const { VENUES, venuePreview } = await import('./venues.mjs');
+  assert.deepEqual(VENUES.map((venue) => venue.id), ['classic', 'sunset', 'coast', 'bamboo', 'lake']);
+  assert.equal(venuePreview('night'), venuePreview('classic'), 'Retired night previews safely use Classic');
+  assert.equal(venuePreview('unknown-venue'), venuePreview('classic'));
+  for (const language of ['zh', 'en']) {
+    const h = await setup({ language, start: false, confirmCharacters: false });
+    assert.equal(h.state().selectedVenue, 'classic');
+    assert.equal(h.state().draftVenue, 'classic');
+    assert.equal(h.get('venue-classic').attributes.get('aria-pressed'), 'true');
+    assert.equal(h.elements.has('venue-night'), false, 'The retired venue is absent from the actual menu');
+    for (const venue of VENUES) {
+      assert.equal(h.get(`venue-name-${venue.id}`).textContent, venue.name[language]);
+      assert.equal(h.get(`venue-desc-${venue.id}`).textContent, venue.description[language]);
+      assert.equal(h.get(`venue-${venue.id}`).attributes.get('aria-label'), `${venue.name[language]} · ${venue.description[language]}`);
+    }
+  }
 });
