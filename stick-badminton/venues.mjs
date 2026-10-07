@@ -1,4 +1,4 @@
-import { COURT_OUTLINE, COURT_MARKINGS, projectCourtPoint, projectCourtMarking, courtLineWidth } from './court-view.mjs?v=solo-arrows-1';
+import { COURT_OUTLINE, COURT_MARKINGS, projectCourtPoint, projectCourtMarking, courtLineWidth } from './court-view.mjs?v=default-labels-1';
 
 export const VENUES = Object.freeze([
   { id: 'classic', name: { zh: '经典绿场', en: 'Classic court' }, description: { zh: '明亮日光，熟悉的绿色球场', en: 'Bright daylight and a classic green court.' } },

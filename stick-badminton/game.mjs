@@ -1,13 +1,13 @@
-import { BadmintonAI } from './ai.mjs?v=solo-arrows-1';
-import { Game, WORLD, RALLY_ACCELERATION } from './engine.mjs?v=solo-arrows-1';
-import { locales } from './locales.mjs?v=solo-arrows-1';
-import { CHARACTERS, characterPreview, drawCharacterDetails } from './characters.mjs?v=solo-arrows-1';
-import { VENUES, venuePreview } from './venues.mjs?v=solo-arrows-1';
-import { COURT_METERS } from './court.mjs?v=solo-arrows-1';
-import { COURT_VIEW, COURT_OUTLINE, COURT_MARKINGS, projectCourtPoint, projectCourtMarking, courtLineWidth } from './court-view.mjs?v=solo-arrows-1';
-import { LEADERBOARD_VERSION, LeaderboardClient, MatchClock } from './leaderboard.mjs?v=solo-arrows-1';
-import { LEADERBOARD_API_BASE } from './leaderboard-config.mjs?v=solo-arrows-1';
-import { LeaderboardUI } from './leaderboard-ui.mjs?v=solo-arrows-1';
+import { BadmintonAI } from './ai.mjs?v=default-labels-1';
+import { Game, WORLD, RALLY_ACCELERATION } from './engine.mjs?v=default-labels-1';
+import { locales } from './locales.mjs?v=default-labels-1';
+import { CHARACTERS, characterPreview, drawCharacterDetails } from './characters.mjs?v=default-labels-1';
+import { VENUES, venuePreview } from './venues.mjs?v=default-labels-1';
+import { COURT_METERS } from './court.mjs?v=default-labels-1';
+import { COURT_VIEW, COURT_OUTLINE, COURT_MARKINGS, projectCourtPoint, projectCourtMarking, courtLineWidth } from './court-view.mjs?v=default-labels-1';
+import { LEADERBOARD_VERSION, LeaderboardClient, MatchClock } from './leaderboard.mjs?v=default-labels-1';
+import { LEADERBOARD_API_BASE } from './leaderboard-config.mjs?v=default-labels-1';
+import { LeaderboardUI } from './leaderboard-ui.mjs?v=default-labels-1';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('game');

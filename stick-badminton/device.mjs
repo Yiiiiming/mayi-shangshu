@@ -13,7 +13,7 @@ export function isMobileDevice(navigator = {}) {
 export async function startPage({
   navigator = globalThis.navigator,
   document = globalThis.document,
-  loadGame = () => import('./game.mjs?v=solo-arrows-1'),
+  loadGame = () => import('./game.mjs?v=default-labels-1'),
 } = {}) {
   const mobile = isMobileDevice(navigator);
   document.getElementById('device-screen').hidden = !mobile;
