@@ -1,0 +1,31 @@
+{
+  "engine": "AB-JChess",
+  "version": "0.2d",
+  "sourceCommit": "fe35d87c7553fd23e8aab3a1dde7e712f286b416",
+  "network": {
+    "filename": "abjchess-20261010.nnue",
+    "bytes": 143667546,
+    "sha256": "05c13ac64f5b8ede77cfdc408d399d1f235564ba0999e2c768bebaeedb1db761",
+    "parts": [
+      {
+        "file": "nnue-part-1.bin",
+        "bytes": 48000000,
+        "sha256": "58b4945dadfe2a13a3a50fc07dea77da59571f1214a6654b4969088e8791e48b"
+      },
+      {
+        "file": "nnue-part-2.bin",
+        "bytes": 48000000,
+        "sha256": "04875fd29f3000b77e112b851c0d1ac0ec7cd8bc49b3197a99b8b937d47628b3"
+      },
+      {
+        "file": "nnue-part-3.bin",
+        "bytes": 47667546,
+        "sha256": "1b5022a362b92a1e04b406a6f7bcd14064bbdc0521a6f6b1d124d065fe2d3e6e"
+      }
+    ]
+  },
+  "maxThreads": 4,
+  "maxHashMB": 256,
+  "defaultThreads": 2,
+  "defaultHashMB": 128
+}

@@ -1,0 +1,11 @@
+The unmodified abjchess-20261010.nnue network is from the upstream AB-JChess
+v0.2d release at https://github.com/lxsgx23/AB-JChess/releases/tag/v0.2d .
+
+The release asset contains no separate network-license text. This notice
+records the network's provenance and does not assert or grant additional
+redistribution rights. The engine's included GPL license is reproduced from
+the engine source; no new license has been invented for the network.
+
+The three nnue-part-*.bin files concatenate, in numerical order, to the exact
+143667546-byte upstream network. SHA-256:
+05c13ac64f5b8ede77cfdc408d399d1f235564ba0999e2c768bebaeedb1db761

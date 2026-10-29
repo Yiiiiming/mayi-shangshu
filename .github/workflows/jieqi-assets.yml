@@ -1,0 +1,104 @@
+name: Build full Jieqi NNUE browser engine
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'jieqi/engine/manifest.json'
+      - 'jieqi/engine/source.patch'
+      - 'jieqi/engine/build.sh'
+      - '.github/workflows/jieqi-assets.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+  pages: write
+concurrency:
+  group: jieqi-engine-assets
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out existing website
+        uses: actions/checkout@v4
+      - name: Download and verify complete pinned source
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 'https://api.github.com/repos/lxsgx23/AB-JChess/tarball/fe35d87c7553fd23e8aab3a1dde7e712f286b416' -o jieqi/engine/AB-JChess-v0.2d-source.tar.gz
+          echo '502330f82ccef1544cda572a75852c431db5f53c7d8fbb452dd51e8630f73df2  jieqi/engine/AB-JChess-v0.2d-source.tar.gz' | sha256sum --check
+          mkdir -p "$RUNNER_TEMP/abj-source"
+          tar -xzf jieqi/engine/AB-JChess-v0.2d-source.tar.gz --strip-components=1 -C "$RUNNER_TEMP/abj-source"
+          python3 - "$RUNNER_TEMP/abj-source" <<'PY'
+          import pathlib, sys
+          for name in ['main.cpp', 'uci.cpp', 'uci.h']:
+              path = pathlib.Path(sys.argv[1]) / 'abjchess/src' / name
+              path.write_bytes(path.read_bytes().replace(b'\r\n', b'\n'))
+          PY
+          patch -p1 -d "$RUNNER_TEMP/abj-source" < jieqi/engine/source.patch
+      - name: Install official Emscripten 3.1.74 in temporary directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch 3.1.74 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          "$RUNNER_TEMP/emsdk/emsdk" install 3.1.74
+          "$RUNNER_TEMP/emsdk/emsdk" activate 3.1.74
+      - name: Compile original full NNUE search with browser entry points
+        shell: bash
+        run: |
+          set -euo pipefail
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          bash jieqi/engine/build.sh "$RUNNER_TEMP/abj-source" "$GITHUB_WORKSPACE/jieqi/engine"
+      - name: Verify upstream full network and split for GitHub hosting
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 'https://github.com/lxsgx23/AB-JChess/releases/download/v0.2d/0.2d_bmi2.zip' -o "$RUNNER_TEMP/abj-v0.2d.zip"
+          echo "01d3d539b1d3c50371132401d70c441364ae1c2e9d6e4121f83143f2fe1b3a4e  $RUNNER_TEMP/abj-v0.2d.zip" | sha256sum --check
+          python3 - "$RUNNER_TEMP/abj-v0.2d.zip" <<'PY'
+          import hashlib, json, pathlib, sys, zipfile
+          output = pathlib.Path('jieqi/engine')
+          manifest = json.loads((output / 'manifest.json').read_text())['network']
+          with zipfile.ZipFile(sys.argv[1]) as package:
+              names = [n for n in package.namelist() if pathlib.PurePosixPath(n).name == manifest['filename']]
+              assert len(names) == 1, 'Expected exactly one matching NNUE'
+              network = package.read(names[0])
+          assert len(network) == 143667546 == manifest['bytes'], 'Wrong full network size'
+          assert hashlib.sha256(network).hexdigest() == manifest['sha256'] == '05c13ac64f5b8ede77cfdc408d399d1f235564ba0999e2c768bebaeedb1db761', 'Wrong full network hash'
+          offset = 0
+          for index, part in enumerate(manifest['parts'], 1):
+              assert part['file'] == f'nnue-part-{index}.bin'
+              chunk = network[offset:offset + part['bytes']]
+              assert len(chunk) == part['bytes'] < 100000000
+              assert hashlib.sha256(chunk).hexdigest() == part['sha256']
+              (output / part['file']).write_bytes(chunk)
+              offset += len(chunk)
+          assert offset == len(network)
+          PY
+      - name: Execute actual WASM searches with full NNUE and five candidates
+        shell: bash
+        run: |
+          set -euo pipefail
+          node jieqi/engine/verify.cjs
+          python3 - <<'PY'
+          import hashlib, pathlib
+          root = pathlib.Path('jieqi/engine')
+          files = sorted(p for p in root.iterdir() if p.is_file() and p.name != 'SHA256SUMS')
+          (root / 'SHA256SUMS').write_text(''.join(f'{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}\n' for p in files))
+          PY
+      - name: Store verified assets only in the Jieqi directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add jieqi/engine/abjchess.js jieqi/engine/abjchess.wasm jieqi/engine/nnue-part-1.bin jieqi/engine/nnue-part-2.bin jieqi/engine/nnue-part-3.bin jieqi/engine/AB-JChess-v0.2d-source.tar.gz jieqi/engine/wasm-verification.json jieqi/engine/SHA256SUMS
+          if ! git diff --cached --quiet; then
+            git commit -m 'Build verified full AB-JChess WASM and NNUE assets'
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
+      - name: Request GitHub Pages refresh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method POST "repos/$GITHUB_REPOSITORY/pages/builds"

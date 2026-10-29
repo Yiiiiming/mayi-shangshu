@@ -1,0 +1,107 @@
+--- a/abjchess/src/main.cpp
++++ b/abjchess/src/main.cpp
+@@ -18,6 +18,10 @@
+ 
+ #include <iostream>
+ #include <string>
++#include <memory>
++#ifdef __EMSCRIPTEN__
++#include <emscripten/emscripten.h>
++#endif
+ 
+ #include "bitboard.h"
+ #include "misc.h"
+@@ -28,6 +32,9 @@
+ using namespace Stockfish;
+ 
+ int main(int argc, char* argv[]) {
++#ifdef __EMSCRIPTEN__
++    (void)argc; (void)argv;
++#else
+ 
+     std::cout << engine_info() << std::endl;
+ 
+@@ -40,5 +47,26 @@
+ 
+     uci.loop();
+ 
++
++#endif
+     return 0;
+ }
++
++#ifdef __EMSCRIPTEN__
++namespace { std::unique_ptr<UCIEngine> wasmUci; }
++extern "C" {
++EMSCRIPTEN_KEEPALIVE void abj_initialize() {
++    if (wasmUci) return;
++    std::cout << engine_info() << std::endl;
++    Bitboards::init();
++    Position::init();
++    static char program[] = "/abjchess";
++    static char* argv[] = {program, nullptr};
++    wasmUci = std::make_unique<UCIEngine>(1, argv);
++    Tune::init(wasmUci->engine_options());
++}
++EMSCRIPTEN_KEEPALIVE void abj_command(const char* command) {
++    if (wasmUci && command) wasmUci->execute(command);
++}
++}
++#endif
+--- a/abjchess/src/uci.cpp
++++ b/abjchess/src/uci.cpp
+@@ -86,11 +86,17 @@
+ }
+ 
+ void UCIEngine::loop() {
+-    std::string token, cmd;
+-
+-    for (int i = 1; i < cli.argc; ++i)
+-        cmd += std::string(cli.argv[i]) + " ";
+-
++    std::string cmd;
++    for (int i = 1; i < cli.argc; ++i) cmd += std::string(cli.argv[i]) + " ";
++    bool running = true;
++    do {
++        if (cli.argc == 1 && !getline(std::cin, cmd)) cmd = "quit";
++        running = execute(cmd);
++    } while (running && cli.argc == 1);
++}
++
++bool UCIEngine::execute(const std::string& cmd) {
++    std::string token;
+     const auto run_network_command = [this](auto&& command, bool finishGo = false) {
+         try
+         {
+@@ -106,12 +112,6 @@
+                 on_bestmove("0000", "");
+         }
+     };
+-
+-    do
+-    {
+-        if (cli.argc == 1
+-            && !getline(std::cin, cmd))  // Wait for an input or an end-of-file (EOF) indication
+-            cmd = "quit";
+ 
+         std::istringstream is(cmd);
+ 
+@@ -177,7 +177,7 @@
+             sync_cout << "Unknown command: '" << cmd << "'. Type help for more information."
+                       << sync_endl;
+ 
+-    } while (token != "quit" && cli.argc == 1);  // The command-line arguments are one-shot
++    return token != "quit";
+ }
+ 
+ Search::LimitsType UCIEngine::parse_limits(std::istream& is) {
+--- a/abjchess/src/uci.h
++++ b/abjchess/src/uci.h
+@@ -41,6 +41,7 @@
+     UCIEngine(int argc, char** argv);
+ 
+     void loop();
++    bool execute(const std::string& cmd);
+ 
+     static int         to_cp(Value v, const Position& pos);
+     static std::string format_score(const Score& s);

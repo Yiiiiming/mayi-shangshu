@@ -1,0 +1,32 @@
+Engine: AB-JChess v0.2d
+Upstream repository: https://github.com/lxsgx23/AB-JChess
+Fixed source commit: fe35d87c7553fd23e8aab3a1dde7e712f286b416
+Source URL: https://api.github.com/repos/lxsgx23/AB-JChess/tarball/fe35d87c7553fd23e8aab3a1dde7e712f286b416
+Source archive SHA-256: 502330f82ccef1544cda572a75852c431db5f53c7d8fbb452dd51e8630f73df2
+Release: https://github.com/lxsgx23/AB-JChess/releases/tag/v0.2d
+Network release asset: https://github.com/lxsgx23/AB-JChess/releases/download/v0.2d/0.2d_bmi2.zip
+Release ZIP SHA-256: 01d3d539b1d3c50371132401d70c441364ae1c2e9d6e4121f83143f2fe1b3a4e
+Network: abjchess-20261010.nnue, 143667546 bytes
+Network SHA-256: 05c13ac64f5b8ede77cfdc408d399d1f235564ba0999e2c768bebaeedb1db761
+
+Browser port dated 2026-10-29:
+- Builds the original C++ search and full NNUE runtime using official Emscripten
+  3.1.74, WASM SIMD and pthreads. The network is not reduced or quantized again.
+- source.patch exposes UCI initialization and single-command execution so a
+  Web Worker can receive commands without blocking on stdin. Native loop
+  handling remains available. No search, scoring or NNUE logic was changed.
+- worker.js adds bounded browser settings, chunk caching, byte counts and
+  SHA-256 verification, and preserves raw UCI lines including mate values.
+- The network is split only for hosting. The worker verifies all three chunks
+  and the joined original file before exposing it to the engine.
+- Defaults: 2 search threads, 128 MiB hash. Browser wrapper limits: 4 search
+  threads, 256 MiB hash. WASM initial memory 512 MiB, maximum 2 GiB.
+
+Complete corresponding engine source is included as
+AB-JChess-v0.2d-source.tar.gz, together with source.patch and build.sh.
+LICENSE is the upstream GNU GPL version 3 text; source headers permit GPL
+version 3 or later. Original AUTHORS and release contributors are retained.
+See NNUE-NOTICE.txt for the separate, factual network provenance notice.
+
+Runtime verification checks operation and output structure. It is not an
+independent playing-strength benchmark or probability calibration study.

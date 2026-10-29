@@ -11,10 +11,11 @@
 <div class="match-head"><div class="player"><span class="side-piece black">将</span><div><strong>黑方</strong><small id="black-role">自由分析</small></div></div><div class="turn-status"><span id="turn-label">红方行棋</span><small id="move-count">第 1 回合</small></div><div class="player right"><div><strong>红方</strong><small id="red-role">自由分析</small></div><span class="side-piece red">帅</span></div></div>
 <div class="wdl-heading"><span>当前局面 · 最佳走法预测</span><span id="wdl-caption">等待引擎分析</span></div>
 <div id="wdl-bar" class="wdl-bar"><span class="black-segment" style="width:0%"></span><span class="draw-segment" style="width:100%">等待分析</span><span class="red-segment" style="width:0%"></span></div>
+<div id="mate-alert" class="mate-alert" role="status" aria-live="polite" hidden><strong id="mate-alert-label"></strong><span id="mate-alert-context"></span></div>
 <div class="board-frame"><svg id="board" viewBox="0 0 620 690" role="group" aria-label="中国象棋，点击棋子选择，再点击落点走棋"></svg></div>
-<div class="board-caption"><span><i class="dot teal"></i>首选 <i class="dot lime"></i>次选 <i class="dot gold"></i>其他候选</span><button id="overlay-toggle" class="text-button" aria-pressed="true">隐藏胜率标记</button></div>
+<div class="board-caption"><span><i class="dot teal"></i>首选 <i class="dot lime"></i>次选 <i class="dot gold"></i>其他候选</span><button id="overlay-toggle" class="text-button" aria-pressed="true">隐藏候选编号</button></div>
 <div class="toolbar"><button id="undo" title="退回一步">↶ <span>后退</span></button><button id="redo" title="前进一步">↷ <span>前进</span></button><button id="flip">⇅ <span>翻转</span></button><button id="ai-move">✦ <span>AI 走一步</span></button><button id="new-game">↺ <span>新棋局</span></button></div>
-<p class="board-hint" id="board-hint">点击彩色标记预览走法；同一落点的多个候选可重复点击切换。</p>
+<p class="board-hint" id="board-hint">棋盘编号对应候选列表。点选候选只显示这一步箭头；点棋子即可收起。</p>
 </section>
 <aside class="analysis-panel">
 <div class="panel-title"><h2>推荐走法 <span id="candidate-badge">10</span></h2><span class="live-status" id="search-status">准备中</span></div>
@@ -23,8 +24,8 @@
 <div class="search-metrics"><span>深度 <b id="depth">—</b></span><span>局面 <b id="nodes">—</b></span><span>速度 <b id="nps">—</b></span></div>
 <div class="candidate-heading"><span>走法 / 当前行棋方视角</span><span>胜率 · 和率</span></div>
 <div id="candidates" class="candidate-list" aria-live="polite"><div class="empty">正在准备完整 Pikafish 神经网络引擎…</div></div>
-<div id="variation" class="variation"><div class="variation-head"><strong>后续推演</strong><span id="variation-depth">点击一个候选</span></div><p id="variation-line">引擎会同时寻找对方的最佳应对。</p><button id="play-candidate" class="primary" disabled>走这一步</button></div>
-<p class="probability-note">百分比直接取自 Pikafish 的胜／和／负模型，针对引擎对抗条件，不代表你对任意对手的实际胜率。和棋单独列出，不计入胜率。</p>
+<div id="variation" class="variation"><div class="variation-head"><strong id="variation-title">后续推演</strong><span id="variation-depth">点击一个候选</span></div><p id="variation-line">引擎会同时寻找对方的最佳应对。</p><button id="play-candidate" class="primary" disabled>走这一步</button></div>
+<p class="probability-note">百分比直接取自 Pikafish 的胜／和／负模型，针对引擎对抗条件，不代表你对任意对手的实际胜率。和棋单独列出，不计入胜率。杀棋步数直接采用引擎的终局计数，包含困毙判负。</p>
 </aside></div>
 <section class="history-panel"><div><h2>棋谱</h2><span id="history-count">0 步</span></div><div id="history" class="history"><span class="muted">棋局从这里开始。</span></div></section>
 <footer><span>浏览器本地计算 · 棋局保存在此浏览器</span><span>多路越多，单路搜索越慢。可增加思考时间。</span><a href="about.html">引擎与规则说明 ↗</a></footer>
