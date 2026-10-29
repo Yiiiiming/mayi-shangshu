@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#181a1b">
+  <title>观棋 · 揭棋分析台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="app-header">
+  <div class="masthead">
+    <a class="brand" href="./"><span class="seal">揭</span><span>观棋</span></a>
+    <nav aria-label="棋种"><a href="../xiangqi/">中国象棋</a><a class="active" href="./" aria-current="page">揭棋</a></nav>
+    <div class="engine-tag"><i id="connection-light"></i><span id="connection">加载中</span></div>
+  </div>
+  <div class="workspace-toolbar">
+    <label class="mode-control" for="game-mode">模式<select id="game-mode"><option value="record">实战录入</option><option value="ai" selected>与 AI 对弈</option></select></label>
+    <div class="toolbar" aria-label="棋局操作">
+      <button id="new-game" type="button"><span aria-hidden="true">＋</span> 新局</button>
+      <button id="undo" type="button" disabled><span aria-hidden="true">↶</span> 悔棋</button>
+      <button id="flip" type="button"><span aria-hidden="true">⇅</span> 翻转</button>
+      <button id="help-move" type="button" disabled><span aria-hidden="true">✦</span> AI 帮我走</button>
+    </div>
+  </div>
+</header>
+<main>
+  <div id="engine-loading" class="engine-loading" role="status">
+    <div><span id="engine-loading-message">加载中</span></div>
+    <progress id="engine-download" max="1" value="0" aria-label="神经网络下载进度"></progress>
+  </div>
+  <div class="workspace">
+    <section class="board-panel" aria-label="揭棋棋盘">
+      <div class="match-head">
+        <div class="player"><span class="side-piece black">将</span><div><strong>黑方</strong><small id="black-role">AI</small></div></div>
+        <div class="turn-status"><span id="turn-label">红方走</span><small id="move-count">0 步</small></div>
+        <div class="player right"><div><strong>红方</strong><small id="red-role">我</small></div><span class="side-piece red">帅</span></div>
+      </div>
+      <div class="wdl-heading" hidden><span id="wdl-perspective">局面判断 · 等待分析</span><span id="wdl-caption">—</span></div>
+      <div id="wdl-bar" class="wdl-bar" aria-label="胜和负估计"><span class="black-segment" style="width:0%"></span><span class="draw-segment" style="width:100%"></span><span class="red-segment" style="width:0%"></span></div>
+      <div id="mate-alert" class="mate-alert" hidden role="status"></div>
+      <div class="board-frame"><svg id="board" viewBox="0 0 620 690" role="group" aria-label="揭棋棋盘，先选棋子，再选落点"></svg></div>
+      <div class="board-caption"><button id="overlay-toggle" class="text-button" type="button" aria-pressed="true">隐藏编号</button></div>
+      <p class="board-hint" id="board-hint" hidden></p>
+    </section>
+    <aside class="analysis-panel" aria-label="引擎分析">
+      <div class="panel-title"><h1>5 种走法</h1><span class="live-status" id="search-status">—</span></div>
+      <p class="perspective-note" id="perspective-note" hidden></p>
+      <div class="controls">
+        <div class="two-fields">
+          <label for="thinking-time">AI 等级<select id="thinking-time"><option value="10000">1 级 · 10 秒</option><option value="30000">2 级 · 30 秒</option><option value="60000">3 级 · 60 秒</option><option value="120000">4 级 · 120 秒</option></select></label>
+          <label for="human-side" hidden>执方<select id="human-side" disabled><option value="r" selected>红方</option><option value="b">黑方</option></select></label>
+        </div>
+        <details class="resources"><summary>设置<span id="resource-caption" hidden></span></summary><div class="two-fields"><label for="threads">线程<select id="threads"><option value="1">1 线程</option><option value="2" selected>2 线程</option><option value="4">4 线程</option></select></label><label for="hash">缓存<select id="hash"><option value="64">64 MB</option><option value="128" selected>128 MB</option><option value="256">256 MB</option></select></label></div><a class="settings-link" href="about.html">规则</a></details>
+      </div>
+      <div class="analysis-actions"><button id="analyze" class="primary" type="button" disabled>分析</button><button id="stop" type="button" disabled>暂停</button></div>
+      <div class="search-metrics" hidden><span>深度 <b id="depth">—</b></span><span>局面 <b id="nodes">—</b></span><span>速度 <b id="nps">—</b></span></div>
+      <div class="candidate-heading" aria-hidden="true"><span>#</span><span>走法</span><span>胜率</span><span>和率</span><span hidden>深度</span></div>
+      <div id="candidates" class="candidate-list" aria-live="polite"><div class="empty">—</div></div>
+      <div id="variation" class="variation" hidden><div class="variation-head"><strong>推演</strong><span id="variation-depth">—</span></div><p id="variation-line">—</p><button id="play-candidate" class="primary" type="button" disabled>走这步</button></div>
+    </aside>
+  </div>
+  <div class="game-details">
+    <section class="history-panel" aria-label="棋谱与揭子"><div class="section-heading"><h2>棋谱</h2><span id="history-count">0 步</span></div><div id="history" class="history"><span class="muted">—</span></div></section>
+    <section class="capture-tray" aria-label="吃子记录"><div class="capture-column"><span>我吃子</span><p id="human-captures">—</p></div><div class="capture-column"><span>对方吃子</span><p id="ai-captures">—</p></div></section>
+  </div>
+</main>
+<div id="toast" role="status"></div>
+<dialog id="new-dialog" aria-labelledby="new-dialog-title">
+  <h2 id="new-dialog-title">新局</h2>
+  <label for="new-mode">模式<select id="new-mode"><option value="record">实战录入</option><option value="ai" selected>与 AI 对弈</option></select></label>
+  <label for="new-side">执方<select id="new-side"><option value="r" selected>红方</option><option value="b">黑方</option></select></label>
+  <p class="dialog-note">清空当前棋局</p>
+  <div class="dialog-actions"><button id="cancel-new" type="button">取消</button><button id="confirm-new" class="primary" type="button">开始</button></div>
+</dialog>
+<dialog id="record-dialog" aria-labelledby="record-dialog-title">
+  <h2 id="record-dialog-title">录入</h2><p id="record-summary">—</p>
+  <label id="reveal-field" for="record-revealed" hidden>揭子<select id="record-revealed"><option value="" selected>选择身份</option><option value="R">车</option><option value="N">马</option><option value="B">相 / 象</option><option value="A">仕 / 士</option><option value="C">炮</option><option value="P">兵 / 卒</option></select></label>
+  <label id="capture-field" for="record-captured" hidden>吃到的暗子<select id="record-captured"><option value="" selected>选择身份</option><option value="R">车</option><option value="N">马</option><option value="B">相 / 象</option><option value="A">仕 / 士</option><option value="C">炮</option><option value="P">兵 / 卒</option></select></label>
+  <p id="record-unknown-note" class="dialog-note" hidden>对方暗吃：未知</p>
+  <p id="record-error" class="record-error" role="alert"></p>
+  <div class="dialog-actions"><button id="record-cancel" type="button">取消</button><button id="record-confirm" class="primary" type="button">确认</button></div>
+</dialog>
+<script src="isolation.js"></script><script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,35 +1,35 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#f5f1e8"><title>观棋 · 象棋分析室</title><link rel="stylesheet" href="style.css"></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#1d2021"><title>观棋 · 象棋</title><link rel="stylesheet" href="style.css"></head>
 <body>
-<header class="masthead"><a class="brand" href="./"><span class="seal">棋</span><span>观棋<span class="brand-sub">XIANGQI STUDIO</span></span></a><nav><a class="active" href="./">中国象棋</a><a href="about.html">引擎说明 <span>↗</span></a></nav><div class="engine-tag"><i id="connection-light"></i><span id="connection">连接引擎中</span></div></header>
+<header class="masthead"><a class="brand" href="./"><span class="seal">棋</span><span>观棋</span></a><nav><a class="active" href="./">象棋</a><a href="../jieqi/">揭棋</a></nav><div class="engine-tag"><i id="connection-light"></i><span id="connection">加载中</span></div><a class="rules-link" href="about.html">规则</a></header>
 <main>
-<div class="intro"><div><p class="eyebrow">每一步，看得更深</p><h1>落子之前，先看全局。</h1></div><p class="intro-copy">在棋盘上比较每一种可能。<br>完整 Pikafish · NNUE 神经网络 · 使用你的设备算力</p></div>
-<div id="engine-loading" class="engine-loading"><div><strong>准备完整神经网络引擎</strong><span id="engine-loading-message">首次打开下载约 51 MB，之后会在浏览器缓存。</span></div><progress id="engine-download" max="1" value="0"></progress></div>
+<div id="engine-loading" class="engine-loading"><div><strong>加载中</strong><span id="engine-loading-message">0%</span></div><progress id="engine-download" max="1" value="0"></progress></div>
 <div class="workspace">
 <section class="board-panel" aria-label="象棋棋盘">
-<div class="match-head"><div class="player"><span class="side-piece black">将</span><div><strong>黑方</strong><small id="black-role">自由分析</small></div></div><div class="turn-status"><span id="turn-label">红方行棋</span><small id="move-count">第 1 回合</small></div><div class="player right"><div><strong>红方</strong><small id="red-role">自由分析</small></div><span class="side-piece red">帅</span></div></div>
-<div class="wdl-heading"><span>当前局面 · 最佳走法预测</span><span id="wdl-caption">等待引擎分析</span></div>
-<div id="wdl-bar" class="wdl-bar"><span class="black-segment" style="width:0%"></span><span class="draw-segment" style="width:100%">等待分析</span><span class="red-segment" style="width:0%"></span></div>
+<div class="match-head"><div class="player"><span class="side-piece black">将</span><div><strong>黑方</strong><small id="black-role" hidden>分析</small></div></div><div class="turn-status"><span id="turn-label">红方行棋</span><small id="move-count" hidden>第 1 回合</small></div><div class="player right"><div><strong>红方</strong><small id="red-role" hidden>分析</small></div><span class="side-piece red">帅</span></div></div>
+<div class="wdl-heading"><span>胜率</span><span id="wdl-caption">—</span></div>
+<div id="wdl-bar" class="wdl-bar"><span class="black-segment" style="width:0%"></span><span class="draw-segment" style="width:100%">—</span><span class="red-segment" style="width:0%"></span></div>
 <div id="mate-alert" class="mate-alert" role="status" aria-live="polite" hidden><strong id="mate-alert-label"></strong><span id="mate-alert-context"></span></div>
 <div class="board-frame"><svg id="board" viewBox="0 0 620 690" role="group" aria-label="中国象棋，点击棋子选择，再点击落点走棋"></svg></div>
-<div class="board-caption"><span><i class="dot teal"></i>首选 <i class="dot lime"></i>次选 <i class="dot gold"></i>其他候选</span><button id="overlay-toggle" class="text-button" aria-pressed="true">隐藏候选编号</button></div>
-<div class="toolbar"><button id="undo" title="退回一步">↶ <span>后退</span></button><button id="redo" title="前进一步">↷ <span>前进</span></button><button id="flip">⇅ <span>翻转</span></button><button id="ai-move">✦ <span>AI 走一步</span></button><button id="new-game">↺ <span>新棋局</span></button></div>
-<p class="board-hint" id="board-hint">棋盘编号对应候选列表。点选候选只显示这一步箭头；点棋子即可收起。</p>
+<div class="board-caption"><button id="overlay-toggle" class="text-button" aria-pressed="true">隐藏编号</button></div>
+<div class="toolbar"><button id="undo" title="退回一步">↶ <span>后退</span></button><button id="redo" title="前进一步">↷ <span>前进</span></button><button id="flip">⇅ <span>翻转</span></button><button id="ai-move">✦ <span>AI 落子</span></button><button id="new-game">↺ <span>新局</span></button></div>
+<p class="board-hint" id="board-hint" hidden></p>
 </section>
 <aside class="analysis-panel">
-<div class="panel-title"><h2>推荐走法 <span id="candidate-badge">10</span></h2><span class="live-status" id="search-status">准备中</span></div>
-<div class="controls"><label class="range-label">候选数量 <output id="candidate-output">10</output><input id="candidate-count" type="range" min="5" max="20" value="10" step="1"><span class="range-ends"><span>5 路</span><span>20 路</span></span></label><div class="two-fields"><label>思考时间<select id="thinking-time"><option value="10000">10 秒 · 深度分析</option><option value="30000">30 秒 · 精细分析</option><option value="60000">60 秒 · 深入研究</option><option value="120000">120 秒 · 长时研究</option></select></label><label>棋局模式<select id="play-mode"><option value="analysis">自由分析</option><option value="red">我执红 · AI 执黑</option><option value="black">我执黑 · AI 执红</option></select></label></div><details class="resources"><summary>计算资源 <span id="resource-caption">4 线程 / 256 MB</span></summary><div class="two-fields"><label>CPU 线程<select id="threads"><option value="2">2 线程</option><option value="4" selected>4 线程</option><option value="6">6 线程</option><option value="8">8 线程</option><option value="12">12 线程</option><option value="16">16 线程</option></select></label><label>搜索缓存<select id="hash"><option value="64">64 MB</option><option value="128">128 MB</option><option value="256" selected>256 MB</option></select></label></div></details></div>
-<div class="analysis-actions"><button id="analyze" class="primary">重新分析</button><button id="stop">暂停计算</button></div>
-<div class="search-metrics"><span>深度 <b id="depth">—</b></span><span>局面 <b id="nodes">—</b></span><span>速度 <b id="nps">—</b></span></div>
-<div class="candidate-heading"><span>走法 / 当前行棋方视角</span><span>胜率 · 和率</span></div>
-<div id="candidates" class="candidate-list" aria-live="polite"><div class="empty">正在准备完整 Pikafish 神经网络引擎…</div></div>
-<div id="variation" class="variation"><div class="variation-head"><strong id="variation-title">后续推演</strong><span id="variation-depth">点击一个候选</span></div><p id="variation-line">引擎会同时寻找对方的最佳应对。</p><button id="play-candidate" class="primary" disabled>走这一步</button></div>
-<p class="probability-note">百分比直接取自 Pikafish 的胜／和／负模型，针对引擎对抗条件，不代表你对任意对手的实际胜率。和棋单独列出，不计入胜率。杀棋步数直接采用引擎的终局计数，包含困毙判负。</p>
+<div class="panel-title"><h2>走法 <span id="candidate-badge">10</span></h2><span class="live-status" id="search-status">—</span></div>
+<div class="controls"><label class="range-label">候选 <output id="candidate-output">10</output><input id="candidate-count" type="range" min="5" max="20" value="10" step="1"><span class="range-ends"><span>5 路</span><span>20 路</span></span></label><div class="two-fields"><label>AI 等级<select id="thinking-time"><option value="10000">1 级 · 10 秒</option><option value="30000">2 级 · 30 秒</option><option value="60000">3 级 · 60 秒</option><option value="120000">4 级 · 120 秒</option></select></label><label>模式<select id="play-mode"><option value="analysis">分析</option><option value="red">执红</option><option value="black">执黑</option></select></label></div><details class="resources"><summary>设置 <span id="resource-caption" hidden>4 线程 / 256 MB</span></summary><div class="two-fields"><label>线程<select id="threads"><option value="2">2 线程</option><option value="4" selected>4 线程</option><option value="6">6 线程</option><option value="8">8 线程</option><option value="12">12 线程</option><option value="16">16 线程</option></select></label><label>缓存<select id="hash"><option value="64">64 MB</option><option value="128">128 MB</option><option value="256" selected>256 MB</option></select></label></div></details></div>
+<div class="analysis-actions"><button id="analyze" class="primary">分析</button><button id="stop">暂停</button></div>
+<div class="search-metrics" hidden><span>深度 <b id="depth">—</b></span><span>局面 <b id="nodes">—</b></span><span>速度 <b id="nps">—</b></span></div>
+<div class="candidate-heading"><span>走法</span><span>胜 / 和 / 负</span></div>
+<div id="candidates" class="candidate-list" aria-live="polite"><div class="empty">—</div></div>
+<div id="variation" class="variation"><div class="variation-head"><strong id="variation-title">后续推演</strong><span id="variation-depth" hidden>—</span></div><p id="variation-line">—</p><button id="play-candidate" class="primary" disabled>落子</button></div>
+
+<details class="history-panel"><summary>棋谱 <span id="history-count">0 步</span></summary><div id="history" class="history"><span class="muted">—</span></div></details>
 </aside></div>
-<section class="history-panel"><div><h2>棋谱</h2><span id="history-count">0 步</span></div><div id="history" class="history"><span class="muted">棋局从这里开始。</span></div></section>
-<footer><span>浏览器本地计算 · 棋局保存在此浏览器</span><span>多路越多，单路搜索越慢。可增加思考时间。</span><a href="about.html">引擎与规则说明 ↗</a></footer>
+
+
 </main><div id="toast" role="status"></div>
-<dialog id="new-dialog"><h2>开始新棋局？</h2><p>当前棋谱会重置。开始前也可以取消并继续分析。</p><div><button id="cancel-new">继续当前棋局</button><button id="confirm-new" class="primary">开始新棋局</button></div></dialog>
+<dialog id="new-dialog"><h2>新开一局？</h2><p>当前棋谱将重置。</p><div><button id="cancel-new">取消</button><button id="confirm-new" class="primary">新开一局</button></div></dialog>
 <script src="isolation.js"></script><script type="module" src="app.js"></script>
 </body></html>

@@ -8,7 +8,7 @@ window.engineEnvironmentReady = (async () => {
   const scope = new URL('./', location.href);
   await navigator.serviceWorker.register(new URL('isolation-worker.js', scope), {scope: scope.pathname});
   await navigator.serviceWorker.ready;
-  const retryKey = 'guanqi-isolation-reload';
+  const retryKey = 'guanqi-isolation-reload:' + scope.pathname;
   const last = Number(sessionStorage.getItem(retryKey) || 0);
   if (Date.now() - last < 15000) {
     throw new Error('浏览器未开启多线程运行环境。请在独立浏览器标签页打开此链接后刷新。');
