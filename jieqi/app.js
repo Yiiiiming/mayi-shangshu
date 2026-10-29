@@ -1,5 +1,6 @@
 import {createJieqiClient} from './jieqi-client.js';
 import {mateLabel,mateTone} from './mate-label.js';
+import {drawMovePreview} from './move-preview.js';
 
 const $=id=>document.getElementById(id),NS='http://www.w3.org/2000/svg';
 const names={r:{R:'车',N:'马',B:'相',A:'仕',K:'帅',C:'炮',P:'兵'},b:{R:'车',N:'马',B:'象',A:'士',K:'将',C:'炮',P:'卒'}};
@@ -22,7 +23,6 @@ function renderBoard(){
   const defs=svg('defs'),g=svg('radialGradient',{id:'ivory',cx:'.35',cy:'.25',r:'.8'},undefined,defs);
   svg('stop',{offset:'0%','stop-color':'#fff3d5'},undefined,g);svg('stop',{offset:'100%','stop-color':'#d4ad73'},undefined,g);
   const dark=svg('radialGradient',{id:'back',cx:'.35',cy:'.25',r:'.8'},undefined,defs);svg('stop',{offset:'0%','stop-color':'#514536'},undefined,dark);svg('stop',{offset:'100%','stop-color':'#29231e'},undefined,dark);
-  const marker=svg('marker',{id:'move-arrow',markerWidth:6,markerHeight:6,refX:5,refY:3,orient:'auto'},undefined,defs);svg('path',{d:'M0 0 L6 3 L0 6 Z',fill:'#167c73'},undefined,marker);
   for(let r=0;r<10;r++)svg('line',{x1:62,y1:65+r*62,x2:558,y2:65+r*62,class:'board-line'});
   for(let c=0;c<9;c++){const x=62+c*62;for(const[a,z]of c===0||c===8?[[65,623]]:[[65,313],[375,623]])svg('line',{x1:x,y1:a,x2:x,y2:z,class:'board-line'});}
   for(const y of[65,499]){svg('path',{d:`M248 ${y} L372 ${y+124} M372 ${y} L248 ${y+124}`,class:'board-line',fill:'none'});}
@@ -33,10 +33,11 @@ function renderBoard(){
   if(state.lastMove)for(const i of[state.lastMove.from,state.lastMove.to]){const{x,y}=xy(i);svg('rect',{x:x-28,y:y-28,width:56,height:56,rx:3,fill:'#fce7ab33',stroke:'#ffedb3','stroke-width':2});}
   for(let i=0;i<90;i++){const{x,y}=xy(i);const target=svg('rect',{x:x-30,y:y-30,width:60,height:60,fill:'transparent','data-square':i,class:'cell-target','aria-label':'落点 '+coord(i)});target.addEventListener('click',()=>cell(i));}
   if(selected!==null)for(const m of state.legalMoves.filter(x=>x.from===selected)){const{x,y}=xy(m.to);svg('circle',{cx:x,cy:y,r:state.board[m.to]?29:7,fill:state.board[m.to]?'none':'#167c73',stroke:state.board[m.to]?'#167c73':'none','stroke-width':3,'pointer-events':'none'});}
-  // Exactly one explicitly selected first move, painted beneath the pieces.
-  if(isRecord()&&active>=0&&candidates[active]&&selected===null){const c=candidates[active],a=xy(c.move.from),z=xy(c.move.to),dx=z.x-a.x,dy=z.y-a.y,len=Math.hypot(dx,dy);if(len)svg('line',{x1:a.x+dx/len*29,y1:a.y+dy/len*29,x2:z.x-dx/len*31,y2:z.y-dy/len*31,stroke:'#167c73','stroke-width':4,'marker-end':'url(#move-arrow)',class:'chosen-arrow','pointer-events':'none'});}
+  // The preview is visual only; neither move nor hidden identity is applied.
+  const preview=isRecord()&&active>=0&&candidates[active]&&selected===null
+    ?drawMovePreview({parent:b,board:state.board,move:candidates[active].move,xy}):null;
   for(let i=0;i<90;i++){
-    const p=state.board[i];if(!p)continue;const{x,y}=xy(i),red=p.side==='r';
+    const p=state.board[i];if(!p||i===preview?.hiddenSquare)continue;const{x,y}=xy(i),red=p.side==='r';
     const e=svg('g',{transform:`translate(${x} ${y})`,class:`piece ${red?'red':'black'} ${p.covered?'covered':''} ${selected===i?'selected':''}`,role:'button',tabindex:0,'data-piece':i,'aria-label':`${red?'红':'黑'}${p.covered?'暗子 '+pieceName(p)+'位':pieceName(p)} ${coord(i)}`});
     svg('circle',{r:26,fill:p.covered?'url(#back)':'url(#ivory)',stroke:p.covered?(red?'#d36b4e':'#b2a78f'):'#967346','stroke-width':1.6,class:'piece-body'},undefined,e);
     svg('circle',{r:22,fill:'none',stroke:p.covered?(red?'#b35740':'#8d8372'):(red?'#a33324':'#292621'),'stroke-width':1,class:'inner-ring'},undefined,e);
@@ -123,12 +124,32 @@ async function analyze(){
 }
 async function afterMove(packet){accept(packet);$('depth').textContent='—';$('nodes').textContent='—';$('nps').textContent='—';if(state.status.over){$('search-status').textContent='棋局结束';return;}if(isRecord()&&!ourTurn()){$('search-status').textContent='等待录入';return;}void analyze();}
 async function cell(i){if(!state||busy||state.status.over)return;if(!isRecord()&&!ourTurn()){toast('轮到 AI 行棋，可暂停计算或悔棋。');return;}const p=state.board[i];if(p?.side===state.side){selected=selected===i?null:i;active=-1;renderBoard();renderCandidates();renderVariation();return;}if(selected!==null){const m=state.legalMoves.find(x=>x.from===selected&&x.to===i);if(m){void chooseMove(m);return;}}selected=null;renderBoard();}
-async function chooseMove(m){if(busy||!state||( !isRecord()&&!ourTurn())||!state.legalMoves.some(x=>same(x,m)))return;const revision=state.revision,originalGame=gameId;busy=true;try{await cancel();if(gameId!==originalGame||state.revision!==revision||!state.legalMoves.some(x=>same(x,m)))return;if(isRecord()){pendingMove={...m,revision:state.revision};const moving=state.board[m.from],victim=state.board[m.to];$('record-summary').textContent=`${state.side==='r'?'红':'黑'}方 ${notation(state.board,m)}（${coord(m.from)} → ${coord(m.to)}）`;
-    $('reveal-field').hidden=!moving.covered;$('capture-field').hidden=!(victim?.covered&&ourTurn());$('record-unknown-note').hidden=!(victim?.covered&&!ourTurn());$('record-revealed').value='';$('record-captured').value='';$('record-error').textContent='';$('record-dialog').showModal();
-    if(!moving.covered&&!victim?.covered){$('record-summary').textContent+=victim?' · 吃'+pieceName(victim):' · 未吃子';}return;
-  }
-  renderButtons();const packet=await client.move(m,state.revision);busy=false;await afterMove(packet);}catch(error){toast(error.message);}finally{busy=false;renderButtons();}
+async function chooseMove(m){
+  if(busy||!state||(!isRecord()&&!ourTurn())||!state.legalMoves.some(x=>same(x,m)))return;
+  const revision=state.revision,originalGame=gameId;busy=true;
+  try{
+    await cancel();
+    if(gameId!==originalGame||state.revision!==revision||!state.legalMoves.some(x=>same(x,m)))return;
+    if(isRecord()){
+      const moving=state.board[m.from],victim=state.board[m.to];
+      const needReveal=!!moving.covered,needCapture=!!(victim?.covered&&ourTurn());
+      // Known moves need no form; an opponent's private capture stays unknown.
+      if(!needReveal&&!needCapture){
+        pendingMove=null;
+        const packet=await client.record(m,{},revision);
+        busy=false;await afterMove(packet);return;
+      }
+      pendingMove={...m,revision};
+      $('record-summary').textContent=`${state.side==='r'?'红':'黑'}方 ${notation(state.board,m)}（${coord(m.from)} → ${coord(m.to)}）`;
+      $('reveal-field').hidden=!needReveal;$('capture-field').hidden=!needCapture;
+      $('record-unknown-note').hidden=!(victim?.covered&&!ourTurn());
+      $('record-revealed').value='';$('record-captured').value='';$('record-error').textContent='';
+      $('record-dialog').showModal();return;
+    }
+    renderButtons();const packet=await client.move(m,revision);busy=false;await afterMove(packet);
+  }catch(error){toast(error.message);}finally{busy=false;renderButtons();}
 }
+
 async function confirmRecord(){if(!pendingMove||busy)return;const observations={};if(!$('reveal-field').hidden){if(!$('record-revealed').value){$('record-error').textContent='请选择这枚暗子揭开后的身份。';return;}observations.revealed=$('record-revealed').value;}if(!$('capture-field').hidden){if(!$('record-captured').value){$('record-error').textContent='请选择你吃掉的暗子身份。';return;}observations.captured=$('record-captured').value;}
   busy=true;$('record-confirm').disabled=true;try{const packet=await client.record({from:pendingMove.from,to:pendingMove.to},observations,pendingMove.revision);pendingMove=null;$('record-dialog').close();busy=false;await afterMove(packet);}catch(error){$('record-error').textContent=error.message;}finally{busy=false;$('record-confirm').disabled=false;renderButtons();}
 }
