@@ -1,0 +1,48 @@
+name: Prepare Xiangqi NNUE assets
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'xiangqi/engine/manifest.json'
+      - '.github/workflows/xiangqi-assets.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+  pages: write
+concurrency:
+  group: xiangqi-engine-assets
+  cancel-in-progress: false
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out existing website
+        uses: actions/checkout@v4
+      - name: Fetch and verify pinned full-size engine
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd xiangqi/engine
+          base='https://github.com/brianhliou/pikafish-wasm/releases/download/v0.1.0'
+          curl --fail --location --retry 3 "$base/pikafish.js" -o pikafish.js
+          curl --fail --location --retry 3 "$base/pikafish.wasm" -o pikafish.wasm
+          curl --fail --location --retry 3 "$base/pikafish.nnue" -o pikafish.nnue
+          curl --fail --location --retry 3 'https://github.com/official-pikafish/Pikafish/archive/6a59ee2f7b105bff64d9efc2692591107787e2b1.tar.gz' -o Pikafish-6a59ee2-source.tar.gz
+          echo '0d19e64cef153a06614c7eadfebefb6d880fb551e9f9b53d5e13a37a6e86ed2f  Pikafish-6a59ee2-source.tar.gz' | sha256sum --check
+          sha256sum --check SHA256SUMS
+      - name: Store verified engine in its own site folder
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add xiangqi/engine/pikafish.js xiangqi/engine/pikafish.wasm xiangqi/engine/pikafish.nnue xiangqi/engine/Pikafish-6a59ee2-source.tar.gz
+          if ! git diff --cached --quiet; then
+            git commit -m 'Add verified full Pikafish WASM and NNUE assets'
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
+      - name: Request GitHub Pages refresh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method POST "repos/$GITHUB_REPOSITORY/pages/builds"

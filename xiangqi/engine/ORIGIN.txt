@@ -1,0 +1,60 @@
+Pikafish browser engine — full mainline search and NNUE, not a simplified fallback
+
+Prepared 2026-10-29 for the 观棋 browser application.
+
+Browser distribution:
+https://github.com/brianhliou/pikafish-wasm/releases/tag/v0.1.0
+
+Pikafish upstream source commit:
+6a59ee2f7b105bff64d9efc2692591107787e2b1 (2026-09-19)
+https://github.com/official-pikafish/Pikafish/tree/6a59ee2f7b105bff64d9efc2692591107787e2b1
+
+Engine files (unchanged from the release):
+pikafish.js — 80,121 bytes
+SHA256 17bc398028450c4c56df27812324cca8e5af9e2c86662f4a0d7f5b328270df3a
+pikafish.wasm — 662,419 bytes
+SHA256 b437f89ca16a1ff9181878813d1991f60b22067dca6b3feb79a26033224a83b1
+pikafish.nnue — 50,706,378 bytes, upstream 2026-09-06 master-net
+SHA256 7d13d73569a9b571ba0eb20cf1596247bc2a42738967e61afef6482b231e900e
+
+The NNUE is identical to the locally installed official Pikafish release's network.
+No network weights or core search/evaluation code were modified.
+
+Corresponding source and build:
+Pikafish-6a59ee2-source.tar.gz contains the complete upstream commit above.
+SHA256 0d19e64cef153a06614c7eadfebefb6d880fb551e9f9b53d5e13a37a6e86ed2f
+source.patch and build.sh are unchanged from the browser distribution v0.1.0.
+Apply source.patch to the upstream source, copy build.sh under wasm/build.sh,
+then run the build with emscripten/emsdk:3.1.74. See README-upstream.md.
+
+Worker customization:
+worker-upstream.js is the unmodified v0.1.0 integration worker.
+worker.js adds versioned Cache Storage for the NNUE, SHA-256 verification,
+bounded downloads, progress throttling, and duplicate-init protection.
+The modified wrapper is distributed under GPL-3.0-or-later together with its source.
+
+Supported integration:
+new Worker('./engine/worker.js')
+init message: {type:'init',jsUrl,wasmUrl,netUrl}; use absolute same-origin URLs.
+After ready: {type:'command',command:'uci'} (one UCI line per message).
+Replies: ready, line, stderr, net-progress, net-written, error, cache-warning.
+net-progress includes {loaded,total,cached}; no transferable buffer is required.
+
+Browser limits:
+WebAssembly SIMD128, pthreads, SharedArrayBuffer and cross-origin isolation required.
+Thread pool is 8; do not set Threads above 8.
+WASM memory grows from 256 MiB up to 1 GiB. Keep Hash substantially below that.
+Actual speed depends on the device and browser; no native-speed guarantee is made.
+
+Verification performed:
+Release JS/WASM/NNUE SHA-256 matched exactly.
+WASM successfully validated/compiled by the bundled Node WebAssembly runtime.
+Worker syntax check passed.
+NNUE first fetch, verified-cache reuse, corrupt-cache recovery and digest rejection
+were tested with the real network bytes. Browser application behavior is tested
+separately by the application integrator.
+
+Licenses:
+Core and browser wrapper: GPL-3.0-or-later; LICENSE included.
+Network: separate NNUE-License.md included; commercial use requires permission.
+Original authors and upstream notices remain in the complete source archive.

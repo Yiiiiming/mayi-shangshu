@@ -1,0 +1,7 @@
+{
+  "version": "v0.1.0",
+  "upstreamCommit": "6a59ee2f7b105bff64d9efc2692591107787e2b1",
+  "nnueBytes": 50706378,
+  "nnueSha256": "7d13d73569a9b571ba0eb20cf1596247bc2a42738967e61afef6482b231e900e",
+  "release": "https://github.com/brianhliou/pikafish-wasm/releases/tag/v0.1.0"
+}
