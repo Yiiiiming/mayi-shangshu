@@ -1,0 +1,38 @@
+{
+  "engine": "id name AB JChess 0.2d",
+  "runtime": "v22.23.4",
+  "readyMs": 449,
+  "networkBytes": 143667546,
+  "searches": [
+    {
+      "position": "position startpos",
+      "timeMs": 2500,
+      "elapsedMs": 2502,
+      "depth": 5,
+      "bestmove": "bestmove a3a4",
+      "infoCount": 30,
+      "lastRows": [
+        "info depth 5 seldepth 8 multipv 1 score cp 5 wdl 494 26 480 nodes 33359 nps 21356 hashfull 7 tbhits 0 time 1562 pv f0e1",
+        "info depth 5 seldepth 21 multipv 2 score cp 4 wdl 493 26 481 nodes 33359 nps 21356 hashfull 7 tbhits 0 time 1562 pv i3i4",
+        "info depth 5 seldepth 14 multipv 3 score cp 4 wdl 493 26 481 nodes 33359 nps 21342 hashfull 7 tbhits 0 time 1563 pv h2h6",
+        "info depth 5 seldepth 8 multipv 4 score cp 4 wdl 493 26 481 nodes 33359 nps 21342 hashfull 7 tbhits 0 time 1563 pv h2h5",
+        "info depth 5 seldepth 7 multipv 5 score cp 4 wdl 493 26 481 nodes 33359 nps 21342 hashfull 7 tbhits 0 time 1563 pv a3a4"
+      ]
+    },
+    {
+      "position": "position startpos moves e3e4N",
+      "timeMs": 1500,
+      "elapsedMs": 1500,
+      "depth": 5,
+      "bestmove": "bestmove a6a5",
+      "infoCount": 30,
+      "lastRows": [
+        "info depth 5 seldepth 6 multipv 1 score cp 0 wdl 487 26 487 nodes 23598 nps 41255 hashfull 4 tbhits 0 time 572 pv a6a5",
+        "info depth 5 seldepth 17 multipv 2 score cp 0 wdl 487 26 487 nodes 23598 nps 41255 hashfull 4 tbhits 0 time 572 pv g9e7",
+        "info depth 5 seldepth 13 multipv 3 score cp 0 wdl 486 26 488 nodes 23598 nps 41255 hashfull 4 tbhits 0 time 572 pv i6i5",
+        "info depth 5 seldepth 8 multipv 4 score cp 0 wdl 486 26 488 nodes 23598 nps 41255 hashfull 4 tbhits 0 time 572 pv c9e7",
+        "info depth 5 seldepth 17 multipv 5 score cp 0 wdl 485 26 489 nodes 23598 nps 41183 hashfull 4 tbhits 0 time 573 pv e6e5"
+      ]
+    }
+  ]
+}
