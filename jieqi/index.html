@@ -5,23 +5,23 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#181a1b">
   <title>观棋 · 揭棋分析台</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=20261029-canva3">
 </head>
-<body>
+<body data-mode="ai">
 <header class="app-header">
-  <div class="masthead">
-    <a class="brand" href="./"><span class="seal">揭</span><span>观棋</span></a>
-    <nav aria-label="棋种"><a href="../xiangqi/">中国象棋</a><a class="active" href="./" aria-current="page">揭棋</a></nav>
-    <div class="engine-tag"><i id="connection-light"></i><span id="connection">加载中</span></div>
-  </div>
-  <div class="workspace-toolbar">
+  <div class="masthead play-toolbar">
+    <a class="brand" href="./"><span class="seal">揭</span><span class="brand-name">观棋</span></a>
+    <nav aria-label="棋种"><a href="../xiangqi/">象棋</a><a class="active" href="./" aria-current="page">揭棋</a></nav>
     <label class="mode-control" for="game-mode">模式<select id="game-mode"><option value="record">实战录入</option><option value="ai" selected>与 AI 对弈</option></select></label>
+    <label class="level-control" for="thinking-time">AI 等级<select id="thinking-time"><option value="10000">1级 · 10秒</option><option value="30000">2级 · 30秒</option><option value="60000">3级 · 60秒</option><option value="120000">4级 · 120秒</option></select></label>
     <div class="toolbar" aria-label="棋局操作">
-      <button id="new-game" type="button"><span aria-hidden="true">＋</span> 新局</button>
-      <button id="undo" type="button" disabled><span aria-hidden="true">↶</span> 悔棋</button>
-      <button id="flip" type="button"><span aria-hidden="true">⇅</span> 翻转</button>
-      <button id="help-move" type="button" disabled><span aria-hidden="true">✦</span> AI 帮我走</button>
+      <button id="new-game" type="button">新局</button>
+      <button id="undo" type="button" disabled>悔棋</button>
+      <button id="flip" type="button">翻转</button>
+      <button id="help-move" type="button" disabled>代走</button>
+      <button id="ai-pause" type="button" disabled>暂停</button>
     </div>
+    <div class="engine-tag"><i id="connection-light"></i><span id="connection">加载中</span></div>
   </div>
 </header>
 <main>
@@ -42,13 +42,13 @@
       <div class="board-frame"><svg id="board" viewBox="0 0 620 690" role="group" aria-label="揭棋棋盘，先选棋子，再选落点"></svg></div>
       <div class="board-caption"><button id="overlay-toggle" class="text-button" type="button" aria-pressed="true">隐藏编号</button></div>
       <p class="board-hint" id="board-hint" hidden></p>
+      <section class="capture-tray" aria-label="我吃到的棋子"><div id="human-captures"></div><span id="ai-captures" hidden></span></section>
     </section>
     <aside class="analysis-panel" aria-label="引擎分析">
       <div class="panel-title"><h1>5 种走法</h1><span class="live-status" id="search-status">—</span></div>
       <p class="perspective-note" id="perspective-note" hidden></p>
       <div class="controls">
         <div class="two-fields">
-          <label for="thinking-time">AI 等级<select id="thinking-time"><option value="10000">1 级 · 10 秒</option><option value="30000">2 级 · 30 秒</option><option value="60000">3 级 · 60 秒</option><option value="120000">4 级 · 120 秒</option></select></label>
           <label for="human-side" hidden>执方<select id="human-side" disabled><option value="r" selected>红方</option><option value="b">黑方</option></select></label>
         </div>
         <details class="resources"><summary>设置<span id="resource-caption" hidden></span></summary><div class="two-fields"><label for="threads">线程<select id="threads"><option value="1">1 线程</option><option value="2" selected>2 线程</option><option value="4">4 线程</option></select></label><label for="hash">缓存<select id="hash"><option value="64">64 MB</option><option value="128" selected>128 MB</option><option value="256">256 MB</option></select></label></div><a class="settings-link" href="about.html">规则</a></details>
@@ -62,7 +62,6 @@
   </div>
   <div class="game-details">
     <section class="history-panel" aria-label="棋谱与揭子"><div class="section-heading"><h2>棋谱</h2><span id="history-count">0 步</span></div><div id="history" class="history"><span class="muted">—</span></div></section>
-    <section class="capture-tray" aria-label="吃子记录"><div class="capture-column"><span>我吃子</span><p id="human-captures">—</p></div><div class="capture-column"><span>对方吃子</span><p id="ai-captures">—</p></div></section>
   </div>
 </main>
 <div id="toast" role="status"></div>
@@ -81,6 +80,6 @@
   <p id="record-error" class="record-error" role="alert"></p>
   <div class="dialog-actions"><button id="record-cancel" type="button">取消</button><button id="record-confirm" class="primary" type="button">确认</button></div>
 </dialog>
-<script src="isolation.js"></script><script type="module" src="app.js"></script>
+<script src="isolation.js"></script><script type="module" src="app.js?v=20261029-canva3"></script>
 </body>
 </html>
