@@ -30,3 +30,22 @@
 @media(max-width:740px){.play-toolbar{gap:7px}.play-toolbar .brand,.play-toolbar nav{display:none}.play-toolbar .mode-control select{width:96px}.play-toolbar .level-control select{width:91px;padding:3px 4px;font-size:10px}.play-toolbar .toolbar{margin-left:auto}.play-toolbar .toolbar button{padding:5px 6px}.play-toolbar .engine-tag{display:none}body[data-mode="ai"] .workspace{display:block}body[data-mode="ai"] .game-details{max-width:none}.game-details{width:100%;max-width:none}.captured-piece{width:33px;height:33px;flex-basis:33px}.capture-tray #human-captures{gap:4px;padding-top:6px}}
 @media(max-width:350px){.play-toolbar{gap:4px;padding:0 6px}.play-toolbar .mode-control select{width:90px}.play-toolbar .level-control select{width:85px}.play-toolbar .toolbar button{padding:5px 4px;font-size:9px}}
 @media(min-width:741px) and (max-width:900px){.play-toolbar{gap:9px}.play-toolbar .brand-name,.play-toolbar nav .active{display:none}.play-toolbar .mode-control{margin-left:0}}
+
+/* Tap the revealed/captured piece to record; no extra confirmation. */
+#record-dialog{width:500px;padding:24px}
+#record-dialog h2{margin-bottom:0}
+#record-dialog #record-summary{margin:10px 0 20px}
+.identity-field+.identity-field{margin-top:20px}
+.identity-field h3{margin:0 0 10px;font-size:12px;font-weight:500;color:var(--muted)}
+.identity-choices{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+#record-dialog .identity-piece{display:grid;place-items:center;min-width:0;min-height:0;padding:3px;background:transparent;border:2px solid transparent;border-radius:50%;aspect-ratio:1;touch-action:manipulation}
+.identity-piece svg{display:block;width:100%;height:auto;pointer-events:none;filter:drop-shadow(0 2px 2px #0004)}
+#record-dialog .identity-piece:hover:not(:disabled){border-color:#b99d6b;background:#b99d6b16}
+#record-dialog .identity-piece:focus-visible{outline:2px solid #d7c18c;outline-offset:3px}
+#record-dialog .identity-piece[aria-pressed="true"]{border-color:#32ae9c;background:#32ae9c20}
+#record-dialog .identity-piece:disabled{opacity:.38;cursor:default}
+#record-dialog .dialog-actions{margin-top:18px}
+@media(max-width:480px){#record-dialog{padding:20px}.identity-choices{grid-template-columns:repeat(3,64px);justify-content:space-between;gap:12px 8px}.identity-field+.identity-field{margin-top:16px}}
+
+/* Optional public-information estimate; never shows the AI's private search. */
+.winrate-toggle{display:block;margin:2px auto 0;min-height:20px;padding:0 5px;border:0;border-radius:2px;background:transparent;color:var(--muted);font-size:9px;line-height:20px}.winrate-toggle[aria-pressed="true"]{color:var(--gold-light);background:#b99a6417}body[data-mode="record"] #show-winrate,body[data-mode="record"] #human-winrate{display:none!important}.human-winrate{font-size:10px;color:var(--gold-light);text-align:center;margin:0 0 7px;line-height:20px}#human-winrate-bar{height:3px;width:100%;margin-top:2px}

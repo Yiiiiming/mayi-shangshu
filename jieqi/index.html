@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#181a1b">
   <title>观棋 · 揭棋分析台</title>
-  <link rel="stylesheet" href="style.css?v=20261029-preview4">
+  <link rel="stylesheet" href="style.css?v=20261029-pick5">
 </head>
 <body data-mode="ai">
 <header class="app-header">
@@ -33,9 +33,10 @@
     <section class="board-panel" aria-label="揭棋棋盘">
       <div class="match-head">
         <div class="player"><span class="side-piece black">将</span><div><strong>黑方</strong><small id="black-role">AI</small></div></div>
-        <div class="turn-status"><span id="turn-label">红方走</span><small id="move-count">0 步</small></div>
+        <div class="turn-status"><span id="turn-label">红方走</span><small id="move-count">0 步</small><button id="show-winrate" class="winrate-toggle" type="button" aria-pressed="false">显示胜率</button></div>
         <div class="player right"><div><strong>红方</strong><small id="red-role">我</small></div><span class="side-piece red">帅</span></div>
       </div>
+      <div id="human-winrate" class="human-winrate" hidden aria-live="polite"><span id="human-winrate-text"></span><div id="human-winrate-bar" hidden aria-hidden="true"></div></div>
       <div class="wdl-heading" hidden><span id="wdl-perspective">局面判断 · 等待分析</span><span id="wdl-caption">—</span></div>
       <div id="wdl-bar" class="wdl-bar" aria-label="胜和负估计"><span class="black-segment" style="width:0%"></span><span class="draw-segment" style="width:100%"></span><span class="red-segment" style="width:0%"></span></div>
       <div id="mate-alert" class="mate-alert" hidden role="status"></div>
@@ -73,13 +74,13 @@
   <div class="dialog-actions"><button id="cancel-new" type="button">取消</button><button id="confirm-new" class="primary" type="button">开始</button></div>
 </dialog>
 <dialog id="record-dialog" aria-labelledby="record-dialog-title">
-  <h2 id="record-dialog-title">录入</h2><p id="record-summary">—</p>
-  <label id="reveal-field" for="record-revealed" hidden>揭子<select id="record-revealed"><option value="" selected>选择身份</option><option value="R">车</option><option value="N">马</option><option value="B">相 / 象</option><option value="A">仕 / 士</option><option value="C">炮</option><option value="P">兵 / 卒</option></select></label>
-  <label id="capture-field" for="record-captured" hidden>吃到的暗子<select id="record-captured"><option value="" selected>选择身份</option><option value="R">车</option><option value="N">马</option><option value="B">相 / 象</option><option value="A">仕 / 士</option><option value="C">炮</option><option value="P">兵 / 卒</option></select></label>
+  <h2 id="record-dialog-title">选棋子</h2><p id="record-summary">—</p>
+  <section id="reveal-field" class="identity-field" hidden><h3 id="reveal-label">揭子</h3><div id="record-revealed" class="identity-choices" role="group" aria-labelledby="reveal-label"></div></section>
+  <section id="capture-field" class="identity-field" hidden><h3 id="capture-label">吃到的暗子</h3><div id="record-captured" class="identity-choices" role="group" aria-labelledby="capture-label"></div></section>
   <p id="record-unknown-note" class="dialog-note" hidden>对方暗吃：未知</p>
   <p id="record-error" class="record-error" role="alert"></p>
-  <div class="dialog-actions"><button id="record-cancel" type="button">取消</button><button id="record-confirm" class="primary" type="button">确认</button></div>
+  <div class="dialog-actions"><button id="record-cancel" type="button">取消</button></div>
 </dialog>
-<script src="isolation.js"></script><script type="module" src="app.js?v=20261029-preview4"></script>
+<script src="isolation.js"></script><script type="module" src="app.js?v=20261029-pick5"></script>
 </body>
 </html>
