@@ -56,6 +56,8 @@ func newStaticHandler(root string) (http.Handler, error) {
 		if info.IsDir() {
 			if !strings.HasSuffix(r.URL.Path, "/") {
 				u := *r.URL
+				u.Scheme = ""
+				u.Host = ""
 				u.Path += "/"
 				http.Redirect(w, r, u.String(), http.StatusMovedPermanently)
 				return
