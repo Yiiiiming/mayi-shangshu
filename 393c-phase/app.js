@@ -5,20 +5,231 @@ const COLORS={ink:'#252b27',muted:'#75786f',green:'#335b4f',rust:'#ae633f',blue:
 const state={selected:'A2',selectedLayer:'local-half',view:'real',enabled:new Set(['local-half','local-floor','local-scallops','local-below','local-above','local-upper']),n:{A:3,B:2,C:1,lower:2},filter:'all',query:''};
 
 const LAYERS=[
-{id:'local-half',phase:'A2',type:'proved',label:'A(2,0): around e = ½',detail:{label:'A(2,0)',status:'proved',statusText:'Proved locally',name:'An open neighborhood of the half-edge line',range:'Around \\(e=\\tfrac12\\), \\(0<t<\\tfrac18\\).',proved:'The exact segment \\(e=\\tfrac12\\), \\(0\\le t\\le\\tfrac18\\) has a unique symmetric bipodal optimizer. NRS2024 proves that this optimizer persists in an open neighborhood of the interior segment.',limit:'The neighborhood width is not quantified here. Horizontal arrows indicate only the direction of extension; their tips are not certified parameter values.'}},
-{id:'local-floor',phase:'A2',type:'proved',label:'A(2,0): near t = 0',detail:{label:'A(2,0)',status:'proved',statusText:'Proved locally',name:'Above the triangle-free boundary',range:'Each fixed \\(0<e<\\tfrac12\\), with \\(0<t<\\delta(e)\\) for some \\(\\delta(e)>0\\).',proved:'RS2025 Theorem 1 / 14 establishes a unique symmetric bipodal optimizer for sufficiently small positive t at each fixed \\(e\\in(0,\\tfrac12)\\).',limit:'No numerical value of \\(\\delta(e)\\) is supplied. Arrows start on the exact \\(t=0\\) boundary and point inward; their lengths do not quantify the theorem.'}},
-{id:'local-scallops',phase:'C',type:'proved',label:'C(n,2): near every scallop',detail:{status:'proved',statusText:'Proved locally',range:'Each \\(n\\ge1\\) and each fixed \\(\\frac{n}{n+1}<e<\\frac{n+1}{n+2}\\), sufficiently close above \\(t_{\\min}(e)\\).',limit:'RS2025 does not give an explicit uniform band width. Arrows are based on the exact scallops, never at a guessed interior “proved point”. Cusp verticals are excluded from this neighborhood statement.'}},
-{id:'local-below',phase:'B1',type:'proved',label:'B(1,1): just below ER',detail:{label:'B(1,1)',status:'proved',statusText:'Proved locally',name:'An undersaturated ER neighborhood',range:'Each fixed \\(\\tfrac12<e<1\\), with \\(0<e^3-t<\\delta(e)\\).',proved:'NRS2023 Theorem 1 gives a unique bipodal optimizer with analytic parameters sufficiently close below ER.',limit:'The positive width \\(\\delta(e)\\) is not quantified here. Downward arrows show only the side of ER covered by the theorem.'}},
-{id:'local-above',phase:'F',type:'proved',label:'Bipodal: just above ER',detail:{label:'Bipodal',status:'proved',statusText:'Proved locally',name:'An oversaturated ER neighborhood',range:'Each fixed \\(e\\in(0,1)\\), \\(e\\ne\\tfrac12\\), with \\(0<t-e^3<\\delta(e)\\).',proved:'KRRS2018 Theorem 1.1 proves a unique bipodal optimizer with analytic parameters sufficiently close above ER. The cited theorem excludes \\(e=\\tfrac12\\).',limit:'This is a local result. It does not prove one F(1,1) phase throughout the upper region or connect it to the upper-boundary neighborhood.'}},
-{id:'local-upper',phase:'F',type:'proved',label:'Bipodal: near the upper boundary',detail:{label:'Bipodal',status:'proved',statusText:'Proved locally',name:'An upper-boundary neighborhood',range:'Each fixed \\(0<e<1\\), with \\(0<e^{3/2}-t<\\delta(e)\\).',proved:'RS2025 Theorem 4 / 20 proves a unique bipodal optimizer with analytic parameters sufficiently close below the upper boundary.',limit:'The arrows show an inward direction, not a known numerical width. Connectivity with the ER-above bipodal neighborhood remains unproved.'}},
-{id:'candidate-a2',phase:'A2',type:'numeric',label:'A(2,0): broader candidate region'},
-{id:'candidate-a',phase:'A',type:'numeric',label:'A(n,0), n ≥ 3'},
-{id:'candidate-b1',phase:'B1',type:'numeric',label:'B(1,1): broader candidate region'},
-{id:'candidate-b',phase:'B',type:'numeric',label:'B(n,1), n ≥ 2'},
-{id:'candidate-c',phase:'C',type:'numeric',label:'C(n,2): broader candidate regions'},
-{id:'candidate-f',phase:'F',type:'open',label:'F(1,1): the full upper region'},
-{id:'candidate-small',phase:'Tsmall',type:'numeric',label:'Tripodal O(e) branch'},
-{id:'candidate-large',phase:'Tlarge',type:'numeric',label:'Tripodal Θ(1) branch'}
+  {
+    "id": "local-half",
+    "phase": "A2",
+    "type": "proved",
+    "label": "A(2,0): around e = ½",
+    "detail": {
+      "label": "A(2,0)",
+      "status": "proved",
+      "statusText": "Proved locally",
+      "name": "An open neighborhood of the half-edge line",
+      "range": "Around \\(e=\\tfrac12\\), \\(0<t<\\tfrac18\\).",
+      "proved": "The exact segment \\(e=\\tfrac12\\), \\(0\\le t\\le\\tfrac18\\) has a unique symmetric bipodal optimizer. NRS2024 proves that this optimizer persists in an open neighborhood of the interior segment.",
+      "limit": "The neighborhood width is not quantified here. Horizontal arrows indicate only the direction of extension; their tips are not certified parameter values."
+    }
+  },
+  {
+    "id": "local-floor",
+    "phase": "A2",
+    "type": "proved",
+    "label": "A(2,0): near t = 0",
+    "detail": {
+      "label": "A(2,0)",
+      "status": "proved",
+      "statusText": "Proved locally",
+      "name": "Above the triangle-free boundary",
+      "range": "Each fixed \\(0<e<\\tfrac12\\), with \\(0<t<\\delta(e)\\) for some \\(\\delta(e)>0\\).",
+      "proved": "RS2025 Theorem 1 / 14 establishes a unique symmetric bipodal optimizer for sufficiently small positive t at each fixed \\(e\\in(0,\\tfrac12)\\).",
+      "limit": "No numerical value of \\(\\delta(e)\\) is supplied. Arrows start on the exact \\(t=0\\) boundary and point inward; their lengths do not quantify the theorem."
+    }
+  },
+  {
+    "id": "local-scallops",
+    "phase": "C",
+    "type": "proved",
+    "label": "C(n,2): near every scallop",
+    "detail": {
+      "status": "proved",
+      "statusText": "Proved locally",
+      "range": "Each \\(n\\ge1\\) and each fixed \\(\\frac{n}{n+1}<e<\\frac{n+1}{n+2}\\), sufficiently close above \\(t_{\\min}(e)\\).",
+      "limit": "RS2025 does not give an explicit uniform band width. Arrows are based on the exact scallops, never at a guessed interior “proved point”. Cusp verticals are excluded from this neighborhood statement."
+    }
+  },
+  {
+    "id": "local-below",
+    "phase": "B1",
+    "type": "proved",
+    "label": "B(1,1): just below ER",
+    "detail": {
+      "label": "B(1,1)",
+      "status": "proved",
+      "statusText": "Proved locally",
+      "name": "An undersaturated ER neighborhood",
+      "range": "Each fixed \\(\\tfrac12<e<1\\), with \\(0<e^3-t<\\delta(e)\\).",
+      "proved": "NRS2023 Theorem 1 gives a unique bipodal optimizer with analytic parameters sufficiently close below ER.",
+      "limit": "The positive width \\(\\delta(e)\\) is not quantified here. Downward arrows show only the side of ER covered by the theorem."
+    }
+  },
+  {
+    "id": "local-above",
+    "phase": "F",
+    "type": "proved",
+    "label": "Bipodal: just above ER",
+    "detail": {
+      "label": "Bipodal",
+      "status": "proved",
+      "statusText": "Proved locally",
+      "name": "An oversaturated ER neighborhood",
+      "range": "Each fixed \\(e\\in(0,1)\\), \\(e\\ne\\tfrac12\\), with \\(0<t-e^3<\\delta(e)\\).",
+      "proved": "KRRS2018 Theorem 1.1 proves a unique bipodal optimizer with analytic parameters sufficiently close above ER. The cited theorem excludes \\(e=\\tfrac12\\).",
+      "limit": "This is a local result. It does not prove one F(1,1) phase throughout the upper region or connect it to the upper-boundary neighborhood."
+    }
+  },
+  {
+    "id": "local-upper",
+    "phase": "F",
+    "type": "proved",
+    "label": "Bipodal: near the upper boundary",
+    "detail": {
+      "label": "Bipodal",
+      "status": "proved",
+      "statusText": "Proved locally",
+      "name": "An upper-boundary neighborhood",
+      "range": "Each fixed \\(0<e<1\\), with \\(0<e^{3/2}-t<\\delta(e)\\).",
+      "proved": "RS2025 Theorem 4 / 20 proves a unique bipodal optimizer with analytic parameters sufficiently close below the upper boundary.",
+      "limit": "The arrows show an inward direction, not a known numerical width. Connectivity with the ER-above bipodal neighborhood remains unproved."
+    }
+  },
+  {
+    "id": "candidate-a2",
+    "phase": "A2",
+    "n": 2,
+    "type": "numeric",
+    "label": "A(2,0)",
+    "regionId": "a2",
+    "color": "#cbb78d"
+  },
+  {
+    "id": "candidate-a3",
+    "phase": "A",
+    "n": 3,
+    "type": "numeric",
+    "label": "A(3,0)",
+    "regionId": "a3",
+    "color": "#d7c7a4"
+  },
+  {
+    "id": "candidate-a4",
+    "phase": "A",
+    "n": 4,
+    "type": "numeric",
+    "label": "A(4,0)",
+    "regionId": "a4",
+    "color": "#c0a46e"
+  },
+  {
+    "id": "candidate-a5",
+    "phase": "A",
+    "n": 5,
+    "type": "numeric",
+    "label": "A(5,0)",
+    "regionId": "a5",
+    "color": "#e3d6b8"
+  },
+  {
+    "id": "candidate-a6",
+    "phase": "A",
+    "n": 6,
+    "type": "numeric",
+    "label": "A(6,0)",
+    "regionId": "a6",
+    "color": "#af935b"
+  },
+  {
+    "id": "candidate-b1",
+    "phase": "B1",
+    "n": 1,
+    "type": "numeric",
+    "label": "B(1,1)",
+    "regionId": "b1",
+    "color": "#9db7a5"
+  },
+  {
+    "id": "candidate-b2",
+    "phase": "B",
+    "n": 2,
+    "type": "numeric",
+    "label": "B(2,1)",
+    "regionId": "b2",
+    "color": "#b5c9ba"
+  },
+  {
+    "id": "candidate-b3",
+    "phase": "B",
+    "n": 3,
+    "type": "numeric",
+    "label": "B(3,1)",
+    "regionId": "b3",
+    "color": "#7d9d8b"
+  },
+  {
+    "id": "candidate-b4",
+    "phase": "B",
+    "n": 4,
+    "type": "numeric",
+    "label": "B(4,1)",
+    "regionId": "b4",
+    "color": "#c5d6c8"
+  },
+  {
+    "id": "candidate-c1",
+    "phase": "C",
+    "n": 1,
+    "type": "numeric",
+    "label": "C(1,2)",
+    "regionId": "c1",
+    "color": "#a3bac7"
+  },
+  {
+    "id": "candidate-c2",
+    "phase": "C",
+    "n": 2,
+    "type": "numeric",
+    "label": "C(2,2)",
+    "regionId": "c2",
+    "color": "#829fae"
+  },
+  {
+    "id": "candidate-c3",
+    "phase": "C",
+    "n": 3,
+    "type": "numeric",
+    "label": "C(3,2)",
+    "regionId": "c3",
+    "color": "#bdcdd6"
+  },
+  {
+    "id": "candidate-c4",
+    "phase": "C",
+    "n": 4,
+    "type": "numeric",
+    "label": "C(4,2)",
+    "regionId": "c4",
+    "color": "#6e8e9e"
+  },
+  {
+    "id": "candidate-f",
+    "phase": "F",
+    "n": 1,
+    "type": "open",
+    "label": "F(1,1)",
+    "regionId": "f",
+    "color": "#c7b6bd"
+  },
+  {
+    "id": "candidate-small",
+    "phase": "Tsmall",
+    "type": "numeric",
+    "label": "Tripodal O(e) branch"
+  },
+  {
+    "id": "candidate-large",
+    "phase": "Tlarge",
+    "type": "numeric",
+    "label": "Tripodal Θ(1) branch"
+  }
 ];
 
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -52,10 +263,11 @@ const plot={x:62,y:44,w:682,h:505};
 function xy(e,t){let yy=t;if(state.view==='under'){const lo=lower(e),den=e**3-lo;yy=den>1e-12?(t-lo)/den:0;}return [plot.x+e*plot.w,plot.y+(1-yy)*plot.h];}
 function pathFrom(pts){return pts.map((p,i)=>{const [x,y]=xy(p[0],p[1]);return `${i?'L':'M'}${x.toFixed(3)},${y.toFixed(3)}`}).join(' ');}
 function actualPoint(p){if(p.id==='lower'){const n=state.n.lower,e=(n/(n+1)+(n+1)/(n+2))/2;return[e,lower(e)];}if(p.id==='C'){const n=state.n.C,e=(n/(n+1)+(n+1)/(n+2))/2;return[e,lower(e)+.15*(e**3-lower(e))];}if(p.id==='A'){const n=state.n.A,e=(n-1)/n+.016;return[e,lower(e)+.53*(e**3-lower(e))];}if(p.id==='B'){const n=state.n.B,e=n/(n+1)+.038;return[e,lower(e)+.82*(e**3-lower(e))];}return p.position;}
-function drawMap(){const svg=$('phase-map');svg.replaceChildren();const title=node('title',{id:'map-title'},svg);title.textContent=state.view==='real'?'Exact feasible region for edge and triangle densities':'Unfolded coordinates below the ER curve';const desc=node('desc',{id:'map-desc'},svg);desc.textContent='Exact feasible boundaries and ER curve. Model-label locations are schematic, not exact phase boundaries. Use Tab to select model labels.';const defs=node('defs',{},svg);const clip=node('clipPath',{id:'plot-clip'},defs);node('rect',{x:plot.x,y:plot.y,width:plot.w,height:plot.h},clip);const pat=node('pattern',{id:'infeasible-pattern',width:7,height:7,patternUnits:'userSpaceOnUse'},defs);node('path',{d:'M0,7L7,0',stroke:'#d2d0c5','stroke-width':.5,opacity:.32},pat);
+function drawMap(){const svg=$('phase-map');svg.replaceChildren();svg.removeAttribute('aria-labelledby');svg.setAttribute('aria-label',state.view==='real'?'Edge and triangle densities':'Unfolded coordinates below ER');const desc=node('desc',{id:'map-desc'},svg);desc.textContent='Exact feasible boundaries and ER curve. Model-label locations are schematic, not exact phase boundaries. Use Tab to select model labels.';const defs=node('defs',{},svg);const clip=node('clipPath',{id:'plot-clip'},defs);node('rect',{x:plot.x,y:plot.y,width:plot.w,height:plot.h},clip);const pat=node('pattern',{id:'infeasible-pattern',width:7,height:7,patternUnits:'userSpaceOnUse'},defs);node('path',{d:'M0,7L7,0',stroke:'#d2d0c5','stroke-width':.5,opacity:.32},pat);
  node('rect',{x:plot.x,y:plot.y,width:plot.w,height:plot.h,fill:state.view==='real'?'url(#infeasible-pattern)':'#e8e8df'},svg);
  if(state.view==='real'){const domain=[...lowerPoints(),...points(e=>e**1.5).reverse()];node('path',{d:pathFrom(domain)+'Z',fill:'#e8e8df'},svg);}
- const grid=node('g',{'clip-path':'url(#plot-clip)'},svg);for(let i=0;i<=5;i++){const x=plot.x+plot.w*i/5,y=plot.y+plot.h*i/5;node('path',{d:`M${x},${plot.y}V${plot.y+plot.h}`,stroke:'#c2c6bb','stroke-width':.5},grid);node('path',{d:`M${plot.x},${y}H${plot.x+plot.w}`,stroke:'#c2c6bb','stroke-width':.5},grid);}
+ drawNumericalRegions(svg);
+ const grid=node('g',{'clip-path':'url(#plot-clip)','pointer-events':'none'},svg);for(let i=0;i<=5;i++){const x=plot.x+plot.w*i/5,y=plot.y+plot.h*i/5;node('path',{d:`M${x},${plot.y}V${plot.y+plot.h}`,stroke:'#c2c6bb','stroke-width':.5},grid);node('path',{d:`M${plot.x},${y}H${plot.x+plot.w}`,stroke:'#c2c6bb','stroke-width':.5},grid);}
  node('path',{d:`M${plot.x},${plot.y}V${plot.y+plot.h}H${plot.x+plot.w}`,stroke:COLORS.ink,'stroke-width':1,fill:'none'},svg);
  for(let i=0;i<=5;i++){svgText(svg,plot.x+plot.w*i/5,plot.y+plot.h+24,(i/5).toFixed(1),{'text-anchor':'middle',class:'map-axis'});svgText(svg,plot.x-15,plot.y+plot.h-plot.h*i/5+4,(i/5).toFixed(1),{'text-anchor':'end',class:'map-axis'});}
  svgText(svg,plot.x+plot.w/2,plot.y+plot.h+56,'Edge density e',{'text-anchor':'middle',class:'map-axis','font-size':14});if(state.view==='real')svgText(svg,20,plot.y+plot.h/2,'Triangle density t',{class:'map-axis','font-size':14,transform:`rotate(-90 20 ${plot.y+plot.h/2})`,'text-anchor':'middle'});else svgEquation(svg,20,plot.y+plot.h/2,String.raw`\eta=\frac{t-t_{\min}(e)}{e^3-t_{\min}(e)}`,{width:240,height:60,size:13,center:true,transform:`rotate(-90 20 ${plot.y+plot.h/2})`});
@@ -65,9 +277,27 @@ function drawMap(){const svg=$('phase-map');svg.replaceChildren();const title=no
  if(state.view==='real'){svgEquation(svg,220,315,String.raw`t=e^{3/2}`,{width:120,height:32,size:14,transform:'rotate(-34 220 315)'});svgEquation(svg,480,341,String.raw`t=e^3`,{width:90,height:32,size:14,transform:'rotate(-43 480 341)'});svgEquation(svg,525,530,String.raw`t_{\min}(e)`,{width:100,height:32,size:14});svgText(svg,70,67,'Infeasible',{class:'map-small'});}else{svgText(svg,plot.x+12,plot.y+23,'ER: η = 1',{class:'curve-label'});svgText(svg,plot.x+12,plot.y+plot.h-12,'Lower boundary: η = 0',{class:'curve-label'});}
  if(state.view==='real'){for(let n=1;n<=7;n++){node('path',{d:pathFrom(points(lower,n/(n+1),(n+1)/(n+2),60)),stroke:n%2?'#335b4f':'#7b9481','stroke-width':2.4,fill:'none'},svg);}}
  for(let n=2;n<=7;n++){const e=(n-1)/n,t=(n-1)*(n-2)/n**2,[x,y]=xy(e,t);node('circle',{cx:x,cy:y,r:3,fill:COLORS.ink},svg);}
- drawGuides(svg);
- $('map-caption').textContent=state.view==='real'?'Figure 1 · Exact formulas determine all curves, including each lower-boundary scallop. Curvature becomes subtle at this scale; inspect it below. Numbered markers refer to the controls below. Green arrows indicate inward directions only: no width or arrow-tip coordinate is certified. Candidate guides appear only when checked.':'Figure 1b · At fixed e, the interval from tmin(e) to e³ is rescaled to η∈[0,1]. This coordinate transform flattens the scalloped boundary; see the close-up for its geometry. Model labels remain qualitative guides. Dots mark the Turán cusps.';
- svg.onpointermove=ev=>{const r=svg.getBoundingClientRect(),sx=(ev.clientX-r.left)*800/r.width,sy=(ev.clientY-r.top)*630/r.height,e=(sx-plot.x)/plot.w,u=1-(sy-plot.y)/plot.h;if(e<0||e>1||u<0||u>1){$('coordinate').innerHTML='e — &nbsp;&nbsp; t —';return;}const t=state.view==='real'?u:lower(e)+u*(e**3-lower(e));const feasible=t>=lower(e)-1e-9&&t<=e**1.5+1e-9;$('coordinate').textContent=`e ${e.toFixed(4)}   t ${t.toFixed(5)}${feasible?'':' · Infeasible'}`;};svg.onpointerleave=()=>{$('coordinate').innerHTML='e — &nbsp;&nbsp; t —';};
+ drawGuides(svg);$('numerical-note').hidden=!numericalActive();
+ $('map-caption').textContent=state.view==='real'?'Figure 1 · Exact formulas determine all curves, including each lower-boundary scallop. Curvature becomes subtle at this scale; inspect it below. Numbered markers refer to the controls at right. Green arrows indicate inward directions only: no width or arrow-tip coordinate is certified. Numerical regions appear only when checked; their interior boundaries are schematic.':'Figure 1b · At fixed e, the interval from tmin(e) to e³ is rescaled to η∈[0,1]. This coordinate transform flattens the scalloped boundary; see the close-up for its geometry. Model labels remain qualitative guides. Dots mark the Turán cusps.';
+ svg.onpointermove=ev=>{if(numericalActive()){const cell=ev.target.closest('[data-region-label]');$('coordinate').textContent=cell?cell.dataset.regionLabel+' · numerical candidate':'Numerical boundaries are schematic';return;}const r=svg.getBoundingClientRect(),sx=(ev.clientX-r.left)*800/r.width,sy=(ev.clientY-r.top)*630/r.height,e=(sx-plot.x)/plot.w,u=1-(sy-plot.y)/plot.h;if(e<0||e>1||u<0||u>1){$('coordinate').innerHTML='e — &nbsp;&nbsp; t —';return;}const t=state.view==='real'?u:lower(e)+u*(e**3-lower(e));const feasible=t>=lower(e)-1e-9&&t<=e**1.5+1e-9;$('coordinate').textContent=`e ${e.toFixed(4)}   t ${t.toFixed(5)}${feasible?'':' · Infeasible'}`;};svg.onpointerleave=()=>{$('coordinate').innerHTML='e — &nbsp;&nbsp; t —';};
+}
+
+function numericalActive(){return LAYERS.some(l=>l.regionId&&state.enabled.has(l.id));}
+function drawNumericalRegions(svg){
+ const group=node('g',{id:'numerical-regions','clip-path':'url(#plot-clip)'},svg);
+ for(const cell of NUMERICAL_REGIONS){
+  const layer=LAYERS.find(l=>l.regionId===cell.id);
+  if(!state.enabled.has(layer.id)||(state.view==='under'&&cell.phase==='F'))continue;
+  const pts=cell.points.map(([e,q])=>[e,q<=1?lower(e)+q*(e**3-lower(e)):e**3+(q-1)*(e**1.5-e**3)]);
+  const regionPath=state.view==='under'?cell.points.map(([e,q],i)=>`${i?'L':'M'}${(plot.x+e*plot.w).toFixed(3)},${(plot.y+(1-q)*plot.h).toFixed(3)}`).join(' '):pathFrom(pts);
+  const path=node('path',{d:regionPath+'Z',fill:cell.color,'fill-opacity':.76,stroke:COLORS.paper,'stroke-width':.7,class:'numerical-region',tabindex:0,role:'button','data-region-label':cell.label,'aria-label':cell.label+' numerical region; schematic boundary'},group);
+  const act=()=>selectPhase(cell.phase,false,layer.id);path.onclick=act;path.onkeydown=ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();act();}};
+ }
+ for(const [id,e0,e1,q,color] of [['candidate-small',.0024,.2113,.998,'#b77a58'],['candidate-large',.00001,.0024,.9999,'#8f647b']]){
+  if(!state.enabled.has(id))continue;
+  const l=LAYERS.find(x=>x.id===id),pts=[...points(e=>q*e**3,e0,e1,100),...points(e=>e**3,e0,e1,100).reverse()];
+  const path=node('path',{d:pathFrom(pts)+'Z',fill:color,stroke:color,'stroke-width':.5,class:'numerical-region','data-region-label':l.label,role:'button',tabindex:0,'aria-label':l.label+' approximate numerical strip'},group);path.onclick=()=>selectPhase(l.phase,false,l.id);
+ }
 }
 function localArrow(svg,e,t,dx,dy,layer,n=null){
  const [x,y]=xy(e,t);
@@ -110,15 +340,15 @@ function drawGuides(svg){
  if(!under&&on('local-above')){const l=get('local-above');[.27,.43,.66,.82].forEach(e=>localArrow(svg,e,e**3,0,-16,l));mapCallout(svg,'Bipodal: above ER',328,392,xy(.43,.43**3),l);}
  if(!under&&on('local-upper')){const l=get('local-upper');[.28,.47,.67,.84].forEach(e=>localArrow(svg,e,e**1.5,0,16,l));mapCallout(svg,'Bipodal: near upper boundary',270,270,xy(.47,.47**1.5),l);}
  const labels=under?{A2:[469,374],A:[556,292],B1:[577,161],B:[662,229],C:[536,437],Tsmall:[188,127],Tlarge:[91,188]}:{A2:[277,476],A:[583,365],B1:[606,334],B:[691,250],C:[476,500],F:[402,205],Tsmall:[126,471],Tlarge:[110,430]};
- for(const l of LAYERS.filter(l=>l.type!=='proved'&&on(l.id))){const p=PHASES.find(p=>p.id===l.phase);if(under&&p.id==='F')continue;const coords=labels[p.id];if(!coords)continue;const [ax,ay]=xy(...actualPoint(p)),[x,y]=coords;let text=p.id==='A'?`A(${state.n.A},0)`:p.id==='B'?`B(${state.n.B},1)`:p.id==='C'?`C(${state.n.C},2)`:p.label;
+ for(const l of LAYERS.filter(l=>l.type!=='proved'&&!l.regionId&&on(l.id))){const p=PHASES.find(p=>p.id===l.phase);if(under&&p.id==='F')continue;const coords=labels[p.id];if(!coords)continue;const [ax,ay]=xy(...actualPoint(p)),[x,y]=coords;let text=p.id==='A'?`A(${state.n.A},0)`:p.id==='B'?`B(${state.n.B},1)`:p.id==='C'?`C(${state.n.C},2)`:p.label;
  mapCallout(svg,text,x,y,[ax,ay],l);
  }
 }
 function matrixMarkup(p){const n=state.n[p.id]||p.n;let count=1,weights=[1],values=[['e']],symbols=[];if(p.matrix==='A'){count=n;weights=Array(n).fill(1/n);values=Array.from({length:n},(_,i)=>Array.from({length:n},(_,j)=>i===j?'a':'b'));}else if(p.matrix==='B'){count=n+1;weights=[...Array(n).fill(.62/n),.38];values=Array.from({length:count},(_,i)=>Array.from({length:count},(_,j)=>i<n&&j<n?(i===j?'a':'b'):i===n&&j===n?'p':'d'));}else if(p.matrix==='C'||p.matrix==='lower'){count=n+2;weights=[...Array(n).fill(.6/n),.2,.2];values=Array.from({length:count},(_,i)=>Array.from({length:count},(_,j)=>{if(p.matrix==='lower')return i===j?'0':i>=n&&j>=n?'p':'1';return i<n&&j<n?(i===j?'a':'b'):i>=n&&j>=n?(i===j?'p':'q'):'d';}));}else if(p.matrix==='T'){count=3;weights=[.27,.27,.46];values=[['a','b','d'],['b','a','d'],['d','d','p']];}else if(p.matrix==='upper'){count=2;weights=[.62,.38];values=[['1','0'],['0','0']];}const palette={a:'#ccd4c5',b:'#477266',d:'#91a999',p:'#b38c61',q:'#d7b68f',e:'#7b9a84','0':'#fcfbf7','1':'#2d4f42'};let s='<svg viewBox="0 0 170 172" role="img" aria-label="Symbolic block graphon, origin at bottom left and vertical coordinate increasing upward">';let rowOffset=0;for(let i=0;i<count;i++){const rowHeight=weights[i]*152,y=4+152-rowOffset-rowHeight;let x=4;for(let j=0;j<count;j++){const w=weights[j]*152,h=weights[i]*152,v=values[i][j];s+=`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${palette[v]}" stroke="#f4f1e7" stroke-width="1.2"/>`;if(count<=7||i===count-1||j===count-1)s+=`<text x="${x+w/2}" y="${y+h/2+4}" text-anchor="middle" fill="${['b','1'].includes(v)?'#fcfbf7':'#252b27'}" font-family="KaTeX_Math,KaTeX_Main,Georgia,serif" font-style="italic" font-size="${count>6?9:13}">${v}</text>`;x+=w;}rowOffset+=rowHeight;}s+='<rect x="4" y="4" width="152" height="152" fill="none" stroke="#8f968a" stroke-width=".6"/><text x="80" y="170" text-anchor="middle" fill="#75786f" font-size="8">Graphon coordinates: y ↑</text></svg>';return s;}
-function selectPhase(id,scroll=false,layerId=null){state.selected=id;state.selectedLayer=layerId;const base=PHASES.find(p=>p.id===id);if(!base)return;const selectedLayer=LAYERS.find(l=>l.id===layerId&&l.phase===id),p=selectedLayer?.detail?{...base,...selectedLayer.detail}:selectedLayer&&selectedLayer.type!=='proved'?{...base,status:selectedLayer.type,statusText:selectedLayer.type==='open'?'Open global phase':'Numerical candidate'}:base;if(state.view==='under'&&['F','upper'].includes(id)){state.view='real';updateViewButtons();}const nn=state.n[id]||p.n;const title=id==='A'?`A(${nn},0)`:id==='B'?`B(${nn},1)`:id==='C'?`C(${nn},2)`:p.label;let formula=p.formula;if(id==='C')formula=String.raw`\[n=${nn},\qquad\frac{${nn}}{${nn+1}}<e<\frac{${nn+1}}{${nn+2}}\]\[\text{Number of pods}=${nn+2}\]`;
+function selectPhase(id,scroll=false,layerId=null){state.selected=id;state.selectedLayer=layerId;const base=PHASES.find(p=>p.id===id);if(!base)return;const selectedLayer=LAYERS.find(l=>l.id===layerId&&l.phase===id),p=selectedLayer?.detail?{...base,...selectedLayer.detail}:selectedLayer&&selectedLayer.type!=='proved'?{...base,status:selectedLayer.type,statusText:selectedLayer.type==='open'?'Open global phase':'Numerical candidate'}:base;if(state.view==='under'&&['F','upper'].includes(id)){state.view='real';updateViewButtons();}if(selectedLayer?.n){state.n[id]=selectedLayer.n;p.selector=null;}const nn=state.n[id]||p.n;const title=id==='A'?`A(${nn},0)`:id==='B'?`B(${nn},1)`:id==='C'?`C(${nn},2)`:p.label;let formula=p.formula;if(id==='C')formula=String.raw`\[n=${nn},\qquad\frac{${nn}}{${nn+1}}<e<\frac{${nn+1}}{${nn+2}}\]\[\text{Number of pods}=${nn+2}\]`;
  $('detail').innerHTML=`<div class="detail-top"><span>MODEL / ${String(PHASES.indexOf(base)+1).padStart(2,'0')}</span><span class="status ${p.status}">${rich(p.statusText)}</span></div><h3>${/^[A-Z]\(/.test(title)?String.raw`\(${title}\)`:esc(title)}</h3><p class="model-name">${rich(p.name)}</p>${selectedLayer&&selectedLayer.type!=='proved'?'<p class="layer-context">Optional candidate layer: its extent is not proved. The map location is schematic; any local theorem described below has a narrower scope.</p>':''}${p.selector?`<label class="model-control">Family parameter n <select id="n-selector" aria-label="Pod-family parameter n">${Array.from({length:p.selector[1]-p.selector[0]+1},(_,i)=>p.selector[0]+i).map(n=>`<option value="${n}"${n===nn?' selected':''}>${n}</option>`).join('')}</select><span>The family continues for all n</span></label>`:''}<div class="scope">${rich(p.range)}</div><div class="matrix-row">${matrixMarkup(p)}<p>${rich(p.matrixNote)}</p></div><div class="detail-formula">${rich(formula)}</div><h4>WHAT IS PROVED</h4><p>${rich(p.proved)}</p><h4>LIMITS OF THE EVIDENCE</h4><p>${rich(p.limit)}</p><h4>PRIMARY SOURCES</h4><div class="reference-links">${refLinks(p.refs)}</div>`;
  typeset($('detail'));
- if($('n-selector'))$('n-selector').onchange=e=>{state.n[id]=+e.target.value;selectPhase(id,false,state.selectedLayer);};document.querySelectorAll('#phase-index button').forEach(b=>{const active=b.dataset.layer?b.dataset.layer===state.selectedLayer:b.dataset.phase===id&&!state.selectedLayer;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});drawMap();if(scroll)$('atlas').scrollIntoView({behavior:'smooth',block:'start'});}
+ if($('n-selector'))$('n-selector').onchange=e=>{state.n[id]=+e.target.value;selectPhase(id,false,state.selectedLayer);};document.querySelectorAll('#phase-index button[data-phase]').forEach(b=>{const active=b.dataset.layer?b.dataset.layer===state.selectedLayer:b.dataset.phase===id&&!state.selectedLayer;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});drawMap();if(scroll)$('atlas').scrollIntoView({behavior:'smooth',block:'start'});}
 function updateViewButtons(){['real','under'].forEach(v=>{const b=$('view-'+v);b.classList.toggle('active',state.view===v);b.setAttribute('aria-pressed',String(state.view===v));});}
 function drawSlice(){const svg=$('slice-chart');const bands=[{label:'B(1,1)',id:'B1',top:.735**3,bottom:.37373880},{label:'B(2,1)',id:'B',top:.37368265,bottom:.37171725},{label:'A(3,0)',id:'A',n:3,top:.37154879,bottom:.36138489},{label:'B(2,1)',id:'B',top:.36132874,bottom:.35745410},{label:'C(2,2)',id:'C',n:2,top:.35739795,bottom:.35706102},{label:'A(4,0)',id:'A',n:4,top:.35694871,bottom:.35475870},{label:'C(2,2)',id:'C',n:2,top:.35318639,bottom:lower(.735)}];svgText(svg,45,21,'t ↓',{'font-family':'Georgia','font-size':17,fill:COLORS.ink});svgText(svg,158,21,'Numerical sequence · heights not to scale',{'font-size':10,fill:COLORS.muted});const colors={B1:'#b7c7b8',B:'#bdcdbf',A:'#dbcba9',C:'#bdcbd3'};let y=40;bands.forEach((b,i)=>{const h=59,g=node('g',{class:'slice-band',tabindex:0,role:'button','aria-label':`${b.label}, t from ${b.bottom} to ${b.top}`},svg);node('rect',{x:82,y,width:204,height:h,fill:colors[b.id]},g);svgText(g,184,y+35,b.label,{'font-family':'Georgia','font-size':21,'text-anchor':'middle',fill:COLORS.ink});svgText(svg,310,y+17,b.top.toFixed(8),{'font-size':11,'font-family':'Georgia',fill:COLORS.muted});svgText(svg,310,y+h-7,b.bottom.toFixed(8),{'font-size':11,'font-family':'Georgia',fill:COLORS.muted});node('path',{d:`M65,${y}h10M65,${y+h}h10`,stroke:COLORS.muted,'stroke-width':.6},svg);const act=()=>{if(b.n)state.n[b.id]=b.n;if(b.id==='B')state.n.B=2;selectPhase(b.id,true);};g.onclick=act;g.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();act();}};y+=h;if(i<bands.length-1){node('rect',{x:82,y,width:204,height:25,fill:'#deded7'},svg);svgText(svg,310,y+16,`Bracket: ${bands[i+1].top.toFixed(8)}–${b.bottom.toFixed(8)}`,{'font-size':9,fill:COLORS.muted});y+=25;}});svgText(svg,82,y+29,'Lower boundary tmin(0.735) ≈ '+lower(.735).toFixed(6),{'font-size':11,'font-family':'Georgia',fill:COLORS.muted});}
 function drawScallop(){
@@ -137,10 +367,12 @@ function drawScallop(){
 }
 function renderLedger(){const q=state.query.toLowerCase();const rows=LEDGER.filter(r=>(state.filter==='all'||r.type===state.filter)&&[r.region,r.sub,r.model,r.note,...r.refs.map(x=>source(x).short)].join(' ').toLowerCase().includes(q));$('ledger-body').innerHTML=rows.map(r=>`<tr><td>${rich(r.region)}<span class="small">${rich(r.sub)}</span></td><td>${rich(r.model)}</td><td><span class="status ${r.type}">${{proved:'Proved',numeric:'Numerical',open:'Open'}[r.type]}</span><br>${rich(r.note)}</td><td>${refLinks(r.refs)}</td></tr>`).join('');$('ledger-count').textContent=`${rows.length} / ${LEDGER.length} evidence entries`;$('empty-search').hidden=rows.length>0;typeset($('ledger-body'));}
 function renderLayerControls(){
- const row=l=>`<div class="layer-option ${l.type}"><input type="checkbox" id="layer-${l.id}" data-layer-check="${l.id}" aria-label="Show ${esc(l.label)}" ${state.enabled.has(l.id)?'checked':''}><button class="layer-name" data-phase="${l.phase}" data-layer="${l.id}"><span class="layer-key">${LAYERS.indexOf(l)+1}</span>${esc(l.label)}</button><label for="layer-${l.id}" class="layer-status">${l.type==='proved'?'Proved':l.type==='numeric'?'Numerical':'Open'}</label></div>`;
- $('phase-index').innerHTML=`<div class="layer-heading"><span>CHOOSE LAYERS</span><p>Numbers match the markers on the graph. Check a layer to show it; select its name to read the evidence.</p></div><div class="layer-group"><h4>Local theorems</h4><div class="layer-grid">${LAYERS.filter(l=>l.type==='proved').map(row).join('')}</div></div><div class="layer-group"><h4>Candidate phases <span>Off by default</span></h4><div class="layer-grid">${LAYERS.filter(l=>l.type!=='proved').map(row).join('')}</div></div><div class="exact-models"><span>Exact models, always drawn:</span>${['ER','upper','lower'].map(id=>{const p=PHASES.find(p=>p.id===id);return `<button data-phase="${id}">${esc(p.label)}</button>`;}).join('')}</div>`;
- typeset($('phase-index'));
+ const row=l=>`<div class="layer-option ${l.type}"><input type="checkbox" id="layer-${l.id}" data-layer-check="${l.id}" aria-label="Show ${esc(l.label)}" ${state.enabled.has(l.id)?'checked':''}><button class="layer-name" data-phase="${l.phase}" data-layer="${l.id}"><span class="layer-key"${l.color?` style="background:${l.color};border-color:${l.color}"`:''}>${LAYERS.indexOf(l)+1}</span>${esc(l.label)}</button><label for="layer-${l.id}" class="layer-status">${l.type==='proved'?'Proved':l.type==='numeric'?'Numerical':'Open'}</label></div>`;
+ $('phase-index').innerHTML=`<div class="region-actions"><button id="show-numerical">Show numerical regions</button><button id="clear-numerical">Clear regions</button></div><div class="layer-heading"><span>CHOOSE LAYERS</span><p>Check a layer to show it. Colored swatches match numerical regions; select a name or region to read its evidence.</p></div><div class="layer-group theorem-group"><h4>Local theorems</h4><div class="layer-grid">${LAYERS.filter(l=>l.type==='proved').map(row).join('')}</div></div><div class="layer-group candidate-group"><h4>Candidate phases <span>Off by default</span></h4><div class="layer-grid">${LAYERS.filter(l=>l.type!=='proved').map(row).join('')}</div></div><div class="exact-models"><span>Exact models, always drawn:</span>${['ER','upper','lower'].map(id=>{const p=PHASES.find(p=>p.id===id);return `<button data-phase="${id}">${esc(p.label)}</button>`;}).join('')}</div>`;
+ $('show-numerical').onclick=()=>{LAYERS.filter(l=>l.regionId).forEach(l=>state.enabled.add(l.id));document.querySelectorAll('[data-layer-check]').forEach(i=>i.checked=state.enabled.has(i.dataset.layerCheck));state.view='under';updateViewButtons();selectPhase('A2',false,'candidate-a2');};$('clear-numerical').onclick=()=>{LAYERS.filter(l=>l.regionId).forEach(l=>state.enabled.delete(l.id));document.querySelectorAll('[data-layer-check]').forEach(i=>i.checked=state.enabled.has(i.dataset.layerCheck));drawMap();};typeset($('phase-index'));
  document.querySelectorAll('[data-layer-check]').forEach(input=>input.onchange=()=>{const id=input.dataset.layerCheck,l=LAYERS.find(l=>l.id===id);if(input.checked){state.enabled.add(id);selectPhase(l.phase,false,id);}else{state.enabled.delete(id);drawMap();}});
- document.querySelectorAll('#phase-index button').forEach(b=>b.onclick=()=>selectPhase(b.dataset.phase,false,b.dataset.layer||null));
+ document.querySelectorAll('#phase-index button[data-phase]').forEach(b=>b.onclick=()=>selectPhase(b.dataset.phase,false,b.dataset.layer||null));
 }
 renderLayerControls();$('view-real').onclick=()=>{state.view='real';updateViewButtons();drawMap();};$('view-under').onclick=()=>{state.view='under';if(['F','upper'].includes(state.selected))selectPhase('A2');updateViewButtons();drawMap();};$('search').oninput=e=>{state.query=e.target.value;renderLedger();};document.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{state.filter=b.dataset.filter;document.querySelectorAll('[data-filter]').forEach(x=>x.classList.toggle('active',x===b));renderLedger();});$('reference-list').innerHTML=SOURCES.map(s=>`<li id="ref-${s.id}"><a class="ref-title" href="${s.url}" target="_blank" rel="noopener">${esc(s.title)} ↗</a><span class="ref-meta">${esc(s.authors)} · ${s.year}<br>${esc(s.journal)}</span><span class="ref-links">${s.doi?`<a href="${s.doi}" target="_blank" rel="noopener">Journal version ↗</a>`:''}${s.full?`<a href="${s.full}" target="_blank" rel="noopener">Full text ↗</a>`:''}</span></li>`).join('');selectPhase('A2',false,'local-half');drawSlice();drawScallop();$('scallop-n').onchange=drawScallop;renderLedger();typeset(document.body);
+
+if(location.hash==='#numerical')$('show-numerical').click();

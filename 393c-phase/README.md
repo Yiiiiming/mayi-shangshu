@@ -14,3 +14,5 @@ The page uses half-Shannon entropy throughout: `h(p) = −½[p log p + (1−p) l
 The numerical slice at `e = 0.735` preserves the six transition brackets reported in KRRS (2017); its outer endpoints use the exact feasible-boundary and Erdős–Rényi formulas. Candidate phases should not be promoted to globally proved optima without a theorem with matching hypotheses.
 
 No personal lecture scans or lecture-note module are included in this published site.
+
+The colored numerical regions reconstruct the **topology** of the distorted sketch in KRRS (2017), Figure 1. Cusp locations and outer curves are anchored to exact formulas, but the interpolated interior boundaries are illustrative, not measured transition coordinates. The fourteen cells have individual controls. Higher-order phases outside this finite sketch remain uncolored. The two later tripodal strips are separate approximate numerical layers.
